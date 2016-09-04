@@ -34,7 +34,10 @@ type Segment
 
 
 joinPoints =
-    List.foldl (\elem accum -> accum ++ formatPoint elem) ""
+    -- List.foldl (\elem accum -> accum ++ formatPoint elem) ""
+    -- optimize this again, beware of trailing/preceding spaces
+    List.map formatPoint
+        >> String.join " "
 
 
 formatSegment segment =
