@@ -17,23 +17,37 @@ type alias Point =
     ( Float, Float )
 
 
-type Mode
-    = Relative
-    | Absolute
-
-
 type Segment
     = ClosePath
-      -- moveTo and lineTo often take multiple points
-      -- express as a list to optimize
-    | MoveTo Mode (List Point)
-    | LineTo Mode (List Point)
-    | Vertical Mode Float
-    | Horizontal Mode Float
-    | ArcTo Point Float ( ArcFlag, SweepFlag ) Point
+      -- move (*many versions for optimization)
+    | MoveAbsolute Point
+    | MoveAbsoluteMany (List Point)
+    | MoveRelative Point
+    | MoveRelativeMany (List Point)
+      -- line
+    | LineAbsolute Point
+    | LineAbsoluteMany (List Point)
+    | LineRelative Point
+    | LineRelativeMany (List Point)
+      -- one-directional line
+    | VerticalAbsolute Float
+    | VerticalRelative Float
+    | HorizontalAbsolute Float
+    | HorizontalRelative Float
+      -- curves
+    | QuadraticAbsolute Point Point
+    | QuadraticRelative Point Point
+    | QuadraticNextAbsolute Point
+    | QuadraticNextRelative Point
+    | CubicAbsolute Point Point Point
+    | CubicRelative Point Point Point
+    | CubicNextAbsolute Point Point
+    | CubicNextRelative Point Point
+      -- arcs
+    | ArcTo Point Float ( ArcFlag, Direction ) Point
 
 
-joinPoints =
+formatPoints =
     -- List.foldl (\elem accum -> accum ++ formatPoint elem) ""
     -- optimize this again, beware of trailing/preceding spaces
     List.map formatPoint
@@ -45,29 +59,66 @@ formatSegment segment =
         ClosePath ->
             "Z"
 
-        MoveTo Absolute points ->
-            "M" ++ joinPoints points
+        MoveAbsolute point ->
+            "M" ++ formatPoint point
 
-        MoveTo Relative points ->
-            "m" ++ joinPoints points
+        MoveAbsoluteMany points ->
+            "M" ++ formatPoints points
 
-        LineTo Absolute points ->
-            "L" ++ joinPoints points
+        MoveRelative point ->
+            "m" ++ formatPoint point
 
-        LineTo Relative points ->
-            "l" ++ joinPoints points
+        MoveRelativeMany points ->
+            "m" ++ formatPoints points
 
-        Vertical Absolute y ->
+        LineAbsolute point ->
+            "L" ++ formatPoint point
+
+        LineAbsoluteMany points ->
+            "L" ++ formatPoints points
+
+        LineRelative point ->
+            "l" ++ formatPoint point
+
+        LineRelativeMany points ->
+            "l" ++ formatPoints points
+
+        VerticalAbsolute y ->
             "V" ++ toString y
 
-        Vertical Relative dy ->
+        VerticalRelative dy ->
             "v" ++ toString dy
 
-        Horizontal Absolute x ->
+        HorizontalAbsolute x ->
             "H" ++ toString x
 
-        Horizontal Relative dx ->
+        HorizontalRelative dx ->
             "h" ++ toString dx
+
+        QuadraticAbsolute ( cx, cy ) ( x, y ) ->
+            "Q" ++ formatPoint ( cx, cy ) ++ " " ++ formatPoint ( x, y )
+
+        QuadraticRelative ( dcx, dcy ) ( dx, dy ) ->
+            "q" ++ formatPoint ( dcx, dcy ) ++ " " ++ formatPoint ( dx, dy )
+
+        CubicAbsolute c1 c2 point ->
+            -- note that cubic == quadratic iff c1 == c2. Maybe optimize that?
+            "C" ++ String.join " " (List.map formatPoint [ c1, c2, point ])
+
+        CubicRelative dc1 dc2 dpoint ->
+            "c" ++ String.join " " (List.map formatPoint [ dc1, dc2, dpoint ])
+
+        QuadraticNextAbsolute point ->
+            "T" ++ formatPoint point
+
+        QuadraticNextRelative dpoint ->
+            "t" ++ formatPoint dpoint
+
+        CubicNextAbsolute c point ->
+            "S" ++ formatPoints [ c, point ]
+
+        CubicNextRelative dc dpoint ->
+            "s" ++ formatPoints [ dc, dpoint ]
 
         ArcTo ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
             let
@@ -101,9 +152,9 @@ type ArcFlag
 
 
 {-|
-clockwise (1) or anti-clockwise (0) direction
+Also called 'sweepflag'. Clockwise (1) or anti-clockwise (0) direction
 -}
-type SweepFlag
+type Direction
     = AntiClockwise
     | Clockwise
 
@@ -120,34 +171,3 @@ concat instrA instrB =
 formatPoint : Point -> String
 formatPoint ( x, y ) =
     toString x ++ "," ++ toString y ++ " "
-
-
-draw : Path -> Svg.Attribute msg
-draw segments =
-    segments
-        |> Debug.log "segments"
-        |> List.reverse
-        |> List.map formatSegment
-        |> String.join " "
-        |> Svg.Attributes.d
-
-
-{-| Paramorphism that moves from left to the right.
-The `List a` argument in the per-element function is
-a list of items that have not yet been visited.
--}
-paral : (a -> List a -> b -> b) -> b -> List a -> b
-paral func acc list =
-    case list of
-        [] ->
-            acc
-
-        x :: xs ->
-            paral func (func x xs acc) xs
-
-
-{-| joins two segments of the same kind into one
--}
-optimize : List String -> List String
-optimize =
-    identity
