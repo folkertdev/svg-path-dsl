@@ -1,8 +1,83 @@
-module Path exposing (..)
+module Path
+    exposing
+        ( close
+          -- move
+        , moveTo
+        , moveBy
+        , moveToMany
+        , moveByMany
+          -- line
+        , lineTo
+        , lineBy
+        , verticalTo
+        , verticalBy
+        , horizontalTo
+        , horizontalBy
+          -- arc
+        , arc
+          -- curve
+        , cubicBy
+        , cubicTo
+        , quadraticBy
+        , quadraticTo
+        , cubicToMany
+        , cubicByMany
+        , quadraticToMany
+        , quadraticByMany
+          -- continuations
+        , quadraticContinueTo
+        , quadraticContinueBy
+        , cubicContinueTo
+        , cubicContinueBy
+        , segmentToString
+        , segmentsToString
+        , segmentsToAttribute
+        )
 
-{-|
+{-| A Domain-specific language for SVG paths.
 
-* make table with svg -> this api conversion
+The naming convention used in this package is that `*To` is the absolute version (capital in path syntax) and `*By` is the
+relative version (lowercase in path syntax).
+
+To learn what these commands do exactly and visually, [MDN has an excellent tutorial](https://developer.mozilla.org/en/docs/Web/SVG/Tutorial/Paths).
+
+#Conversion
+@docs segmentToString, segmentsToString, segmentsToAttribute
+
+#Move
+@docs moveTo, moveBy
+
+The many variants take a list of points to move to. For generating many moves, this function is more efficient and
+the resulting `d` attribute string is shorter.
+
+@docs moveToMany, moveByMany
+
+#Line
+@docs lineTo, lineBy, verticalTo, verticalBy, horizontalTo, horizontalBy
+
+#Arc
+
+@docs arc
+
+#Close
+@docs close
+
+#Quadratic Curve
+Quadratic curves are defined by a control point and a goal point.
+@docs quadraticTo, quadraticBy, quadraticToMany, quadraticByMany
+
+#Cubic Curve
+Cubic curves are defined by two control points and a goal point.
+@docs cubicTo, cubicBy, cubicToMany, cubicByMany
+
+#Curve Continuations
+Special syntax for writing longer curves. These functions take one fewer control point than the
+complete constructors for quadratic and cubic. The missing control point is
+inferred from the current control point.
+
+**note: ** adding continuations after non-curve instructions is not illegal in svg, but this library makes it impossible.
+A continuation after a non-curve instruction should be replaced by `lineTo/lineBy`.
+@docs quadraticContinueTo, quadraticContinueBy, cubicContinueTo, cubicContinueBy
 -}
 
 import Internal exposing (..)
@@ -11,6 +86,37 @@ import Html
 import Svg
 import Svg.Attributes exposing (..)
 import List.Extra as List
+
+
+{-| Convert a segment to a string
+
+    segmentToString (moveTo ( 20, 20 )) == "M20,20"
+    segmentToString close == "Z"
+-}
+segmentToString : Segment -> String
+segmentToString =
+    Internal.formatSegment
+
+
+{-| Convert a list of segments to string
+
+    segmentsToString
+        [ moveTo ( 20, 20 )
+        , lineTo ( 20, 40 )
+        , close
+        ]
+            == "M20,20 L20,40 Z"
+-}
+segmentsToString : List Segment -> String
+segmentsToString =
+    String.join " " << List.map Internal.formatSegment
+
+
+{-| Helper to convert a list of segments to an SVG attribute
+-}
+segmentsToAttribute : List Segment -> Svg.Attribute msg
+segmentsToAttribute =
+    Svg.Attributes.d << segmentsToString
 
 
 {-| A location in 2D space
@@ -27,6 +133,14 @@ moveTo ( x, y ) =
     MoveAbsolute ( x, y )
 
 
+{-| Equivalent of moveTo that takes a list of points and moves
+to them in order.
+-}
+moveToMany : List Point -> Segment
+moveToMany =
+    MoveAbsoluteMany
+
+
 {-| Move the cursor relative to its current position. No line
 is drawn from the current to the new location.
 -}
@@ -35,7 +149,22 @@ moveBy ( dx, dy ) =
     MoveRelative ( dx, dy )
 
 
+{-| Equivalent of moveBy that takes a list of (dx, dy) pairs.
+-}
+moveByMany : List Point -> Segment
+moveByMany =
+    MoveRelativeMany
+
+
 {-| Draw a line from the current cursor position to a point in 2D space.
+
+    cubeAbsolute =
+        [ moveTo ( 20, 20 )
+        , lineTo ( 40, 20 )
+        , lineTo ( 40, 40 )
+        , lineTo ( 20, 40 )
+        , lineTo ( 20, 20 )
+        ]
 -}
 lineTo : Point -> Segment
 lineTo ( x, y ) =
@@ -44,34 +173,42 @@ lineTo ( x, y ) =
 
 {-| Draw a line from the current cursor position to a position relative
 to the current position.
+
+    cubeRelative =
+        [ moveTo ( 20, 20 )
+        , lineBy ( 20, 0 )
+        , lineBy ( 0, 20 )
+        , lineBy ( -20, 0 )
+        , lineBy ( 0, -20 )
+        ]
 -}
 lineBy : Point -> Segment
 lineBy ( dx, dy ) =
     LineRelative ( dx, dy )
 
 
-{-|
+{-| Draw a straight line from the current cursor position to the given y coordinate.
 -}
 verticalTo : Float -> Segment
 verticalTo y =
     VerticalAbsolute y
 
 
-{-|
+{-| Draw a straight vertical line from the current cursor position of the given length.
 -}
 verticalBy : Float -> Segment
 verticalBy dy =
     VerticalRelative dy
 
 
-{-|
+{-| Draw a straight line from the current cursor position to the given x coordinate.
 -}
 horizontalTo : Float -> Segment
 horizontalTo x =
     HorizontalAbsolute x
 
 
-{-|
+{-| Draw a straight horizontal line from the current cursor position of the given length.
 -}
 horizontalBy : Float -> Segment
 horizontalBy dx =
@@ -82,7 +219,7 @@ horizontalBy dx =
 -- curve
 
 
-{-|
+{-| Draw a quadratic curve from the current cursor position to the
 -}
 quadraticTo : Point -> Point -> Segment
 quadraticTo control point =
@@ -91,22 +228,23 @@ quadraticTo control point =
 
 {-|
 -}
+quadraticBy : Point -> Point -> Segment
 quadraticBy dcontrol dpoint =
     QuadraticRelative dcontrol dpoint
 
 
 {-|
 -}
-quadraticContTo : Point -> Segment
-quadraticContTo point =
-    QuadraticNextAbsolute point
+quadraticToMany : Point -> Point -> List CurveContinuation -> Segment
+quadraticToMany =
+    QuadraticAbsoluteMany
 
 
 {-|
 -}
-quadraticContBy : Point -> Segment
-quadraticContBy dpoint =
-    QuadraticNextRelative dpoint
+quadraticByMany : Point -> Point -> List CurveContinuation -> Segment
+quadraticByMany =
+    QuadraticRelativeMany
 
 
 {-|
@@ -125,126 +263,80 @@ cubicBy dcontrol1 dcontrol2 dpoint =
 
 {-|
 -}
-cubicContTo : Point -> Point -> Segment
-cubicContTo control point =
-    CubicNextAbsolute control point
+cubicToMany : Point -> Point -> Point -> List CurveContinuation -> Segment
+cubicToMany =
+    CubicAbsoluteMany
 
 
 {-|
 -}
-cubicContBy : Point -> Point -> Segment
-cubicContBy dcontrol dpoint =
-    CubicNextRelative dcontrol dpoint
+cubicByMany : Point -> Point -> Point -> List CurveContinuation -> Segment
+cubicByMany =
+    CubicRelativeMany
+
+
+{-| Extend a curve by a cubic point
+-}
+cubicContinueTo : Point -> Point -> CurveContinuation
+cubicContinueTo =
+    CubiAbsolute
+
+
+{-|
+-}
+cubicContinueBy : Point -> Point -> CurveContinuation
+cubicContinueBy =
+    CubiRelative
+
+
+{-| Extend a curve by a quadratic point
+
+    [ moveTo ( 10, 40 )
+    , quadraticToMany ( 52.5, 100 ) ( 95, 40 ) <|
+        List.map quadraticContinueTo
+            [ ( 180, 40 )
+            , ( 265, 40 )
+            ]
+    ]
+    -- produces "M10,40  Q52.5,100  95,40 T180,40 T265,40"
+
+Creates
+
+<svg style="margin-left: 90px;" width="275" height="100px"><path fill="red" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+    d="M10,40  Q52.5,100  95,40 T180,40 T265,40 "></path></svg>
+-}
+quadraticContinueTo : Point -> CurveContinuation
+quadraticContinueTo =
+    QuadAbsolute
+
+
+{-|
+-}
+quadraticContinueBy : Point -> CurveContinuation
+quadraticContinueBy =
+    QuadRelative
 
 
 
 -- arc
 
 
-{-|
+{-| Arcs are segments of ellipses. The arc command describes an ellips - the first argument
+is the radii (x and y direction), the final argument the center point - and what segment
+of the ellipse to draw.
+
+For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
 -}
-arc : Point -> ( ArcFlag, Direction ) -> Point -> Segment
-arc radius ( largeArcFlag, sweepFlag ) point =
-    ArcTo radius 0 ( largeArcFlag, sweepFlag ) point
+arc : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Segment
+arc radius xstartangle ( largeArcFlag, sweepFlag ) point =
+    ArcTo radius xstartangle ( largeArcFlag, sweepFlag ) point
 
 
-{-|
+{-| Draws a line from the current position to the first point of the path.
 -}
 close : Segment
 close =
     ClosePath
-
-
-optimize : List Segment -> List Segment
-optimize =
-    let
-        unfolder segments =
-            case segments of
-                [] ->
-                    Nothing
-
-                [ x ] ->
-                    Just ( Just x, [] )
-
-                x :: y :: rest ->
-                    case ( x, y ) of
-                        ( MoveAbsolute p1, MoveAbsolute p2 ) ->
-                            Just ( Nothing, MoveAbsoluteMany [ p1, p2 ] :: rest )
-
-                        ( MoveAbsoluteMany ps, MoveAbsolute p ) ->
-                            Just ( Nothing, MoveAbsoluteMany (ps ++ [ p ]) :: rest )
-
-                        _ ->
-                            Just ( Just x, y :: rest )
-
-        folder elem accum =
-            case elem of
-                Nothing ->
-                    accum
-
-                Just v ->
-                    v :: accum
-    in
-        -- fuse with hylo
-        List.unfoldr unfolder >> List.foldr folder []
-
-
-
--- refold folder unfolder []
-
-
-refold : (b -> c -> c) -> (a -> Maybe ( b, a )) -> c -> a -> c
-refold reducer expander base seed =
-    let
-        -- go : c -> a -> c
-        go current seed =
-            case expander seed of
-                Nothing ->
-                    current
-
-                Just ( next, newSeed ) ->
-                    go (reducer next current) newSeed
-    in
-        go base seed
-
-
-rectangle : Point -> Point -> List Segment
-rectangle ( x, y ) ( dx, dy ) =
-    [ moveTo ( x, y )
-    , verticalBy dy
-    , horizontalBy -dx
-    , close
-    ]
-
-
-triangle : Point -> Point -> List Segment
-triangle ( x, y ) ( dx, dy ) =
-    [ moveTo ( x, y )
-    , moveTo ( x + dx, y )
-    , moveTo ( x, y + dy )
-    , close
-    ]
-
-
-result =
-    triangle ( 20, 20 ) ( 20, 20 )
-        |> List.map Internal.formatSegment
-        |> String.join " "
-
-
-showVerbose =
-    result
-        |> Html.text
-
-
-showImage =
-    Svg.svg
-        [ width "1024px", height "600px" ]
-        [ Svg.path [ fill "none", stroke "#000", strokeWidth "1.5", strokeLinecap "round", strokeLinejoin "round", d result ] [] ]
-
-
-main =
-    showImage
 
 
 

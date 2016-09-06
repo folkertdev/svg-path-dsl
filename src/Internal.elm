@@ -17,6 +17,28 @@ type alias Point =
     ( Float, Float )
 
 
+type CurveContinuation
+    = QuadAbsolute Point
+    | QuadRelative Point
+    | CubiAbsolute Point Point
+    | CubiRelative Point Point
+
+
+formatCurveContinuation continuation =
+    case continuation of
+        QuadAbsolute goal ->
+            "T" ++ formatPoint goal
+
+        QuadRelative goal ->
+            "t" ++ formatPoint goal
+
+        CubiAbsolute control goal ->
+            "S" ++ formatPoints [ control, goal ]
+
+        CubiRelative control goal ->
+            "s" ++ formatPoints [ control, goal ]
+
+
 type Segment
     = ClosePath
       -- move (*many versions for optimization)
@@ -37,12 +59,12 @@ type Segment
       -- curves
     | QuadraticAbsolute Point Point
     | QuadraticRelative Point Point
-    | QuadraticNextAbsolute Point
-    | QuadraticNextRelative Point
+    | QuadraticAbsoluteMany Point Point (List CurveContinuation)
+    | QuadraticRelativeMany Point Point (List CurveContinuation)
     | CubicAbsolute Point Point Point
     | CubicRelative Point Point Point
-    | CubicNextAbsolute Point Point
-    | CubicNextRelative Point Point
+    | CubicAbsoluteMany Point Point Point (List CurveContinuation)
+    | CubicRelativeMany Point Point Point (List CurveContinuation)
       -- arcs
     | ArcTo Point Float ( ArcFlag, Direction ) Point
 
@@ -52,6 +74,11 @@ formatPoints =
     -- optimize this again, beware of trailing/preceding spaces
     List.map formatPoint
         >> String.join " "
+
+
+concatMapString : (a -> String) -> List a -> String
+concatMapString f =
+    List.foldl (\e accum -> accum ++ (f e)) ""
 
 
 formatSegment segment =
@@ -108,39 +135,39 @@ formatSegment segment =
         CubicRelative dc1 dc2 dpoint ->
             "c" ++ String.join " " (List.map formatPoint [ dc1, dc2, dpoint ])
 
-        QuadraticNextAbsolute point ->
-            "T" ++ formatPoint point
+        QuadraticAbsoluteMany control goal continuations ->
+            formatSegment (QuadraticAbsolute control goal) ++ concatMapString formatCurveContinuation continuations
 
-        QuadraticNextRelative dpoint ->
-            "t" ++ formatPoint dpoint
+        QuadraticRelativeMany dcontrol dgoal continuations ->
+            formatSegment (QuadraticRelative dcontrol dgoal) ++ concatMapString formatCurveContinuation continuations
 
-        CubicNextAbsolute c point ->
-            "S" ++ formatPoints [ c, point ]
+        CubicAbsoluteMany c1 c2 goal continuations ->
+            formatSegment (CubicAbsolute c1 c2 goal) ++ concatMapString formatCurveContinuation continuations
 
-        CubicNextRelative dc dpoint ->
-            "s" ++ formatPoints [ dc, dpoint ]
+        CubicRelativeMany dc1 dc2 dgoal continuations ->
+            formatSegment (CubicRelative dc1 dc2 dgoal) ++ concatMapString formatCurveContinuation continuations
 
-        ArcTo ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
+        ArcTo radii xAxisRotate ( arcFlag, sweepFlag ) goal ->
             let
-                arc : Int
+                arc : String
                 arc =
                     case arcFlag of
                         Smallest ->
-                            0
+                            "0"
 
                         Largest ->
-                            1
+                            "1"
 
-                sweep : Int
+                sweep : String
                 sweep =
                     case sweepFlag of
                         AntiClockwise ->
-                            0
+                            "0"
 
                         Clockwise ->
-                            1
+                            "1"
             in
-                String.concat [ "A", formatPoint ( rx, ry ), toString xAxisRotate, " " ++ toString arc ++ "," ++ toString sweep ++ " ", formatPoint ( x, y ) ]
+                String.join " " [ "A" ++ formatPoint radii, toString xAxisRotate, arc ++ "," ++ sweep, formatPoint goal ]
 
 
 {-|
@@ -170,4 +197,4 @@ concat instrA instrB =
 
 formatPoint : Point -> String
 formatPoint ( x, y ) =
-    toString x ++ "," ++ toString y ++ " "
+    toString x ++ "," ++ toString y
