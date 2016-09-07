@@ -36,11 +36,14 @@ module Svg.Path
         , quadraticContinueBy
         , cubicContinueTo
         , cubicContinueBy
+          -- conversions
         , segmentToString
         , segmentsToString
         , segmentsToAttribute
+          -- types
         , ArcFlag
         , Direction
+        , Segment
         )
 
 {-| A Domain-specific language for SVG paths.
@@ -61,6 +64,9 @@ Other `Point` arguments have function-specific uses. Curves use them for control
 * Functions with a `Many` suffix take a list of arguments and will try to merge them into one instruction. For example
     `[ moveTo (20, 20), moveTo (40, 40) ]` produces `M20,20 M40,40`, but `[ moveToMany [ (20, 20), (40, 40) ] ]` will produce
     `M20,20 40,40`. The generated path will look the same in both cases.
+
+#Types
+@docs Segment
 
 #Conversion
 
@@ -131,6 +137,12 @@ type alias Direction =
 -}
 type alias ArcFlag =
     Internal.ArcFlag
+
+
+{-| A single SVG instruction
+-}
+type alias Segment =
+    Internal.Segment
 
 
 {-| Convert a segment to a string.
