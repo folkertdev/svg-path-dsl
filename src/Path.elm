@@ -208,8 +208,8 @@ moveByMany =
         ]
 -}
 lineTo : Point -> Segment
-lineTo ( x, y ) =
-    LineAbsolute ( x, y )
+lineTo =
+    LineAbsolute
 
 
 {-|
@@ -231,8 +231,8 @@ to the current position.
         ]
 -}
 lineBy : Point -> Segment
-lineBy ( dx, dy ) =
-    LineRelative ( dx, dy )
+lineBy =
+    LineRelative
 
 
 {-|
@@ -245,131 +245,29 @@ lineByMany =
 {-| Draw a straight line from the current cursor position to the given y coordinate.
 -}
 verticalTo : Float -> Segment
-verticalTo y =
-    VerticalAbsolute y
+verticalTo =
+    VerticalAbsolute
 
 
 {-| Draw a straight vertical line from the current cursor position of the given length.
 -}
 verticalBy : Float -> Segment
-verticalBy dy =
-    VerticalRelative dy
+verticalBy =
+    VerticalRelative
 
 
 {-| Draw a straight line from the current cursor position to the given x coordinate.
 -}
 horizontalTo : Float -> Segment
-horizontalTo x =
-    HorizontalAbsolute x
+horizontalTo =
+    HorizontalAbsolute
 
 
 {-| Draw a straight horizontal line from the current cursor position of the given length.
 -}
 horizontalBy : Float -> Segment
-horizontalBy dx =
-    HorizontalRelative dx
-
-
-
--- curve
-
-
-{-| Draw a quadratic curve from the current cursor position to the
--}
-quadraticTo : Point -> Point -> Segment
-quadraticTo control point =
-    QuadraticAbsolute control point
-
-
-{-|
--}
-quadraticBy : Point -> Point -> Segment
-quadraticBy dcontrol dpoint =
-    QuadraticRelative dcontrol dpoint
-
-
-{-|
--}
-quadraticToMany : Point -> Point -> List CurveContinuation -> Segment
-quadraticToMany =
-    QuadraticAbsoluteMany
-
-
-{-|
--}
-quadraticByMany : Point -> Point -> List CurveContinuation -> Segment
-quadraticByMany =
-    QuadraticRelativeMany
-
-
-{-|
--}
-cubicTo : Point -> Point -> Point -> Segment
-cubicTo control1 control2 point =
-    CubicAbsolute control1 control2 point
-
-
-{-|
--}
-cubicBy : Point -> Point -> Point -> Segment
-cubicBy dcontrol1 dcontrol2 dpoint =
-    CubicRelative dcontrol1 dcontrol2 dpoint
-
-
-{-|
--}
-cubicToMany : Point -> Point -> Point -> List CurveContinuation -> Segment
-cubicToMany =
-    CubicAbsoluteMany
-
-
-{-|
--}
-cubicByMany : Point -> Point -> Point -> List CurveContinuation -> Segment
-cubicByMany =
-    CubicRelativeMany
-
-
-{-| Extend a curve by a cubic point
--}
-cubicContinueTo : Point -> Point -> CurveContinuation
-cubicContinueTo =
-    CubiAbsolute
-
-
-{-|
--}
-cubicContinueBy : Point -> Point -> CurveContinuation
-cubicContinueBy =
-    CubiRelative
-
-
-{-| Extend a curve by a quadratic point
-
-    [ moveTo ( 10, 40 )
-    , quadraticToMany ( 52.5, 100 ) ( 95, 40 ) <|
-        List.map quadraticContinueTo
-            [ ( 180, 40 )
-            , ( 265, 40 )
-            ]
-    ]
-    -- produces "M10,40  Q52.5,100  95,40 T180,40 T265,40"
-
-Creates
-
-<svg style="margin-left: 90px;" width="275" height="100px"><path fill="red" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-    d="M10,40  Q52.5,100  95,40 T180,40 T265,40 "></path></svg>
--}
-quadraticContinueTo : Point -> CurveContinuation
-quadraticContinueTo =
-    QuadAbsolute
-
-
-{-|
--}
-quadraticContinueBy : Point -> CurveContinuation
-quadraticContinueBy =
-    QuadRelative
+horizontalBy =
+    HorizontalRelative
 
 
 {-| -}
@@ -502,3 +400,105 @@ smallestArc =
 close : Segment
 close =
     ClosePath
+
+
+
+-- curve
+
+
+{-| Draw a quadratic curve from the current cursor position to the
+-}
+quadraticTo : Point -> Point -> Segment
+quadraticTo control point =
+    QuadraticAbsolute control point
+
+
+{-|
+-}
+quadraticBy : Point -> Point -> Segment
+quadraticBy dcontrol dpoint =
+    QuadraticRelative dcontrol dpoint
+
+
+{-|
+-}
+quadraticToMany : Point -> Point -> List CurveContinuation -> Segment
+quadraticToMany =
+    QuadraticAbsoluteMany
+
+
+{-|
+-}
+quadraticByMany : Point -> Point -> List CurveContinuation -> Segment
+quadraticByMany =
+    QuadraticRelativeMany
+
+
+{-|
+-}
+cubicTo : Point -> Point -> Point -> Segment
+cubicTo control1 control2 point =
+    CubicAbsolute control1 control2 point
+
+
+{-|
+-}
+cubicBy : Point -> Point -> Point -> Segment
+cubicBy dcontrol1 dcontrol2 dpoint =
+    CubicRelative dcontrol1 dcontrol2 dpoint
+
+
+{-|
+-}
+cubicToMany : Point -> Point -> Point -> List CurveContinuation -> Segment
+cubicToMany =
+    CubicAbsoluteMany
+
+
+{-|
+-}
+cubicByMany : Point -> Point -> Point -> List CurveContinuation -> Segment
+cubicByMany =
+    CubicRelativeMany
+
+
+{-| Extend a curve by a cubic point
+-}
+cubicContinueTo : Point -> Point -> CurveContinuation
+cubicContinueTo =
+    CubiAbsolute
+
+
+{-|
+-}
+cubicContinueBy : Point -> Point -> CurveContinuation
+cubicContinueBy =
+    CubiRelative
+
+
+{-| Extend a curve by a quadratic point
+
+    [ moveTo ( 10, 40 )
+    , quadraticToMany ( 52.5, 100 ) ( 95, 40 ) <|
+        List.map quadraticContinueTo
+            [ ( 180, 40 )
+            , ( 265, 40 )
+            ]
+    ]
+    -- produces "M10,40  Q52.5,100  95,40 T180,40 T265,40"
+
+Creates
+
+<svg style="margin-left: 90px;" width="275" height="100px"><path fill="red" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+    d="M10,40  Q52.5,100  95,40 T180,40 T265,40 "></path></svg>
+-}
+quadraticContinueTo : Point -> CurveContinuation
+quadraticContinueTo =
+    QuadAbsolute
+
+
+{-|
+-}
+quadraticContinueBy : Point -> CurveContinuation
+quadraticContinueBy =
+    QuadRelative
