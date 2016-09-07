@@ -44,6 +44,7 @@ module Svg.Path
         , ArcFlag
         , Direction
         , Segment
+        , Point
         )
 
 {-| A Domain-specific language for SVG paths.
@@ -66,7 +67,7 @@ Other `Point` arguments have function-specific uses. Curves use them for control
     `M20,20 40,40`. The generated path will look the same in both cases.
 
 #Types
-@docs Segment
+@docs Segment, Point
 
 #Conversion
 
@@ -177,7 +178,7 @@ segmentsToAttribute maxNumOfDecimals =
     Svg.Attributes.d << segmentsToString maxNumOfDecimals
 
 
-{-| A location in 2D space
+{-| A 2-tuple of Floats. Used to store a `(x, y)` absolute or `(dx, dy)` relative coordinate.
 -}
 type alias Point =
     ( Float, Float )
@@ -361,7 +362,7 @@ antiClockwise =
     AntiClockwise
 
 
-{-| Pick the arg with the greatest length.
+{-| Pick the arc with the greatest length.
 <svg width="100%" height="200px" id="svgcontext">
 
     <path id="arc2" d="M100 100 A 47 66 49 1 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
