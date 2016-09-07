@@ -7,7 +7,7 @@
         "./src"
     ],
     "exposed-modules": [
-        "Path"
+        "Svg.Path"
     ],
     "dependencies": {
         "elm-community/list-extra": "3.1.0 <= v < 4.0.0",

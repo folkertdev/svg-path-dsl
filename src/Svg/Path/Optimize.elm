@@ -1,6 +1,9 @@
-module Optimize exposing (optimize)
+module Svg.Path.Optimize exposing (optimize)
 
 {-| Helpers for optimizing SVG paths.
+
+Currently unpubished, but should at some point be able
+to compress svg paths.
 
 Two consequtive moves can be joined into one
 
@@ -10,7 +13,7 @@ Two consequtive moves can be joined into one
 @docs optimize
 -}
 
-import Internal exposing (..)
+import Svg.Path.Internal as Internal exposing (..)
 import List.Extra as List
 
 

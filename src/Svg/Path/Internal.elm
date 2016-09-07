@@ -1,4 +1,4 @@
-module Internal exposing (..)
+module Svg.Path.Internal exposing (..)
 
 import String
 import Html

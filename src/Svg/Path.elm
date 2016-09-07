@@ -1,4 +1,4 @@
-module Path
+module Svg.Path
     exposing
         ( close
           -- move
@@ -39,6 +39,8 @@ module Path
         , segmentToString
         , segmentsToString
         , segmentsToAttribute
+        , ArcFlag
+        , Direction
         )
 
 {-| A Domain-specific language for SVG paths.
@@ -85,7 +87,9 @@ the elips around its center by a number of degrees. The final argument is the ce
 The remaining argument is a pair of flags that select the part of the ellips to draw.
 For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
 
-@docs arcTo, arcBy, largestArc, smallestArc, clockwise, antiClockwise
+@docs arcTo, arcBy
+@docs ArcFlag, Direction
+@docs largestArc, smallestArc, clockwise, antiClockwise
 
 #Close
 @docs close
@@ -109,12 +113,24 @@ A continuation after a non-curve instruction should be replaced by `lineTo/lineB
 @docs quadraticContinueTo, quadraticContinueBy, cubicContinueTo, cubicContinueBy
 -}
 
-import Internal exposing (..)
+import Svg.Path.Internal as Internal exposing (..)
 import String
 import Html
 import Svg
 import Svg.Attributes exposing (..)
 import List.Extra as List
+
+
+{-| What direction to pick. See below for visual examples.
+-}
+type alias Direction =
+    Internal.Direction
+
+
+{-| What arc to pick. See below for visual examples.
+-}
+type alias ArcFlag =
+    Internal.ArcFlag
 
 
 {-| Convert a segment to a string.
