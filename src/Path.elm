@@ -14,7 +14,12 @@ module Path
         , horizontalTo
         , horizontalBy
           -- arc
-        , arc
+        , arcTo
+        , arcBy
+        , smallestArc
+        , largestArc
+        , clockwise
+        , antiClockwise
           -- curve
         , cubicBy
         , cubicTo
@@ -42,6 +47,11 @@ relative version (lowercase in path syntax).
 To learn what these commands do exactly and visually, [MDN has an excellent tutorial](https://developer.mozilla.org/en/docs/Web/SVG/Tutorial/Paths).
 
 #Conversion
+
+Conversion from segments to string and attribute. All conversion functions take a `Maybe Int` argument that specifies
+the maximum number of decimals that a number in the output will have. `Nothing` will just use `toString` for the conversion
+from float to string.
+
 @docs segmentToString, segmentsToString, segmentsToAttribute
 
 #Move
@@ -56,8 +66,15 @@ the resulting `d` attribute string is shorter.
 @docs lineTo, lineBy, verticalTo, verticalBy, horizontalTo, horizontalBy
 
 #Arc
+Arcs are segments of ellipses. The arc command describes an ellips and what segment of that elips to draw.
 
-@docs arc
+The first argument is an (rx, ry) pair - the radii of the elips. The second argument `xAxisRotate` rotates
+the elips around its center by a number of degrees. The final argument is the center of the ellips.
+
+The remaining argument is a pair of flags that select the part of the ellips to draw.
+For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
+
+@docs arcTo, arcBy, largestArc, smallestArc, clockwise, antiClockwise
 
 #Close
 @docs close
@@ -88,35 +105,36 @@ import Svg.Attributes exposing (..)
 import List.Extra as List
 
 
-{-| Convert a segment to a string
+{-| Convert a segment to a string.
 
-    segmentToString (moveTo ( 20, 20 )) == "M20,20"
-    segmentToString close == "Z"
+    segmentToString (Just 2) (moveTo ( 20.001, 20 ))
+        == "M20,20"
+    segmentToString Nothing close == "Z"
 -}
-segmentToString : Segment -> String
+segmentToString : Maybe Int -> Segment -> String
 segmentToString =
     Internal.formatSegment
 
 
-{-| Convert a list of segments to string
+{-| Convert a list of segments to string.
 
-    segmentsToString
+    segmentsToString Nothing
         [ moveTo ( 20, 20 )
         , lineTo ( 20, 40 )
         , close
         ]
             == "M20,20 L20,40 Z"
 -}
-segmentsToString : List Segment -> String
-segmentsToString =
-    String.join " " << List.map Internal.formatSegment
+segmentsToString : Maybe Int -> List Segment -> String
+segmentsToString maxNumOfDecimals =
+    String.join " " << List.map (Internal.formatSegment maxNumOfDecimals)
 
 
-{-| Helper to convert a list of segments to an SVG attribute
+{-| Helper to convert a list of segments directly to an SVG attribute.
 -}
-segmentsToAttribute : List Segment -> Svg.Attribute msg
-segmentsToAttribute =
-    Svg.Attributes.d << segmentsToString
+segmentsToAttribute : Maybe Int -> List Segment -> Svg.Attribute msg
+segmentsToAttribute maxNumOfDecimals =
+    Svg.Attributes.d << segmentsToString maxNumOfDecimals
 
 
 {-| A location in 2D space
@@ -317,49 +335,133 @@ quadraticContinueBy =
     QuadRelative
 
 
-
--- arc
-
-
-{-| Arcs are segments of ellipses. The arc command describes an ellips - the first argument
-is the radii (x and y direction), the final argument the center point - and what segment
-of the ellipse to draw.
-
-For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
--}
-arc : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Segment
-arc radius xstartangle ( largeArcFlag, sweepFlag ) point =
+{-| -}
+arcTo : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Segment
+arcTo radius xstartangle ( largeArcFlag, sweepFlag ) point =
     ArcTo radius xstartangle ( largeArcFlag, sweepFlag ) point
 
 
+{-| -}
+arcBy : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Segment
+arcBy radius xstartangle ( largeArcFlag, direction ) point =
+    ArcBy radius xstartangle ( largeArcFlag, direction ) point
+
+
+{-| Move from A to B in the clockwise direction
+<svg width="100%" height="200px" id="svgcontext">
+
+    <path id="arc2" d="M100 100 A 47 66 49 1 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc3" d="M100 100 A 47 66 49 1 0 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc4" d="M100 100 A 47 66 49 0 0 200 100" fill="none" stroke="green" stroke-width="2"></path>
+
+    <path id="arc" d="M100 100 A 47 66 49 0 1 200 100" fill="none" stroke="red" stroke-width="4"></path>
+
+    <line id="line0" x1="0" y1="100" x2="100" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line" x1="100" y1="100" x2="200" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line2" x1="200" y1="100" x2="1027" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+
+    <circle id="circle1" cx="100" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+    <circle id="circle2" cx="200" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+
+</svg>
+-}
+clockwise : Direction
+clockwise =
+    Clockwise
+
+
+{-| Move from A to B in the anti-clockwise direction.
+
+<svg width="100%" height="200px" id="svgcontext">
+
+    <path id="arc2" d="M100 100 A 47 66 49 1 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc3" d="M100 100 A 47 66 49 1 0 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc4" d="M100 100 A 47 66 49 0 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+
+    <path id="arc" d="M100 100 A 47 66 49 0 0 200 100" fill="none" stroke="red" stroke-width="4"></path>
+
+    <line id="line0" x1="0" y1="100" x2="100" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line" x1="100" y1="100" x2="200" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line2" x1="200" y1="100" x2="1027" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+
+    <circle id="circle1" cx="100" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+    <circle id="circle2" cx="200" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+
+</svg>
+-}
+antiClockwise : Direction
+antiClockwise =
+    AntiClockwise
+
+
+{-| Pick the arg with the greatest length.
+<svg width="100%" height="200px" id="svgcontext">
+
+    <path id="arc2" d="M100 100 A 47 66 49 1 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc3" d="M100 100 A 47 66 49 0 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc4" d="M100 100 A 47 66 49 0 0 200 100" fill="none" stroke="green" stroke-width="2"></path>
+
+    <path id="arc" d="M100 100 A 47 66 49 1 0 200 100" fill="none" stroke="red" stroke-width="4"></path>
+
+    <line id="line0" x1="0" y1="100" x2="100" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line" x1="100" y1="100" x2="200" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line2" x1="200" y1="100" x2="1920" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+
+    <circle id="circle1" cx="100" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+    <circle id="circle2" cx="200" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+
+</svg>
+-}
+largestArc : ArcFlag
+largestArc =
+    Largest
+
+
+{-| Pick the arc with the smallest length.
+
+<svg width="100%" height="200px" id="svgcontext">
+
+    <path id="arc2" d="M100 100 A 47 66 49 1 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc3" d="M100 100 A 47 66 49 1 0 200 100" fill="none" stroke="green" stroke-width="2"></path>
+    <path id="arc4" d="M100 100 A 47 66 49 0 1 200 100" fill="none" stroke="green" stroke-width="2"></path>
+
+    <path id="arc" d="M100 100 A 47 66 49 0 0 200 100" fill="none" stroke="red" stroke-width="4"></path>
+
+    <line id="line0" x1="0" y1="100" x2="100" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line" x1="100" y1="100" x2="200" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+    <line id="line2" x1="200" y1="100" x2="1027" y2="100" fill="none" stroke="black" stroke-width="2"></line>
+
+    <circle id="circle1" cx="100" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+    <circle id="circle2" cx="200" cy="100" r="5" fill="red" stroke="red" stroke-width="2"></circle>
+
+
+</svg>
+-}
+smallestArc : ArcFlag
+smallestArc =
+    Smallest
+
+
 {-| Draws a line from the current position to the first point of the path.
+
+`[ moveTo (100, 100), lineTo (200, 100), lineTo (150, 50) ]`
+<svg width="100%" height="100px" id="svgcontext">
+    <path id="arc2" d="M100 100 L200 100 L150 50" fill="red" stroke="black" stroke-width="5"></path>
+</svg>
+
+`[ moveTo (100, 100), lineTo (200, 100), lineTo (150, 50), close ]`
+<svg width="100%" height="100px" id="svgcontext">
+    <path id="arc2" d="M100 100 L200 100 L150 50 Z" fill="red" stroke="black" stroke-width="5"></path>
+</svg>
+
 -}
 close : Segment
 close =
     ClosePath
-
-
-
-{-
-   val = [ M 417.19 124.65, l 5.9 -2.53, M 444.92 137.48, l -0.06 -5.29, M 354.89 151.4, l -4.7 2.02, M 431.79 131.4, l 5.9 -2.53, M 364.78 160.18, l 4.7 -2.02
-       , M 261.64 191.45, l 4.7 -2.02, M 493.24 154.58, l 0.06 5.29, M 589.75 204.5, l 5.9 -2.53, M 380.23 167.33, l -0.05 -4.22, M 661.07 232.23, l -5.9 2.53
-       , M 357.67 91.85, l 541.38 250.51, l -0.16 -12.96, M 289.47 121.13, l 541.38 250.51, l -0.16 -12.96, M 208.03 227.49, l 5.9 -2.53, M 199.34 218.2
-       , l -5.9 2.53, M 682.91 247.6, l -0.06 -5.29, M 276.24 198.2, l 4.7 -2.02, M 675.67 238.99, l -5.9 2.53, M 592.87 261.52, l -4.7 2.02
-       , M 522.75 233.27, l 4.7 -2.02, M 336.49 221.89, l 0.05 4.22, M 434.2 271.3, l 4.7 -2.02, M 280.29 255.66, l -5.9 2.53, M 267.13 254.84
-       , l -0.06 -5.29, M 731.22 264.7, l 0.06 5.29, M 133.92 187.93, L 675.3 438.44, l -0.16 -12.96, M 200.92 159.16, l 541.38 250.51, l -0.16 -12.96
-       , M 607.47 268.28, l -4.7 2.02, M 499.62 301.57, l 4.7 -2.02, M 518.92 306.3, l -4.7 2.02, M 157.98 279.13, l 0.35 28.91, l 124.19 57.46
-       , M 366 300.58, l 5.9 -2.53, M 289.31 108.18, l 541.38 250.51, l 47.86 -20.55, M 833.64 312.08, l -5.9 2.53, M 446.02 337.61, l 5.9 -2.53
-       , M 431.42 330.85, l 5.9 -2.53, M 878.71 351.09, l -0.16 -12.96, L 337.17 87.63, l -47.86 20.55, l 0.16 12.96, l -4.7 2.02, M 574.48 332.01
-       , l 0.05 4.22, M 811.71 379.86, l -0.15 -12.88, l 0 -0.07, L 270.17 116.4, l -69.4 29.8, l 0.16 12.96, l -4.7 2.02, M 609.88 408.17
-       , l -5.9 2.53, M 200.77 146.2, l 541.38 250.51, l 69.32 -29.77, M 765.43 341.37, l -4.7 2.02, M 512.37 368.31, l 5.9 -2.53, M 920.75 346.06
-       , l 0.87 71.85, M 54.26 244.02, l 55.49 25.68, l 14.44 -6.2, M 54.97 302.91, L 576.5 544.23, l 20.46 0.07, l 37.33 -16.03, M 109.6 256.74
-       , l 0.87 71.85, l 47.86 -20.55, M 505.12 364.96, l -0.06 -5.29, M 357.52 78.89, L 898.9 329.4, l 59.58 -25.59, M 840.66 380.45, l 80.95 37.46
-       , l 38.04 -16.29, L 958.37 295, L 436.84 53.68, l -20.45 -0.07, l -58.87 25.28, l 0.16 12.96, l -5.9 2.53, M 855.11 374.25, l 66.35 30.7
-       , l 38.04 -16.33, M 133.76 174.98, l 541.38 250.51, l 47.86 -20.55, M 723.16 417.89, l -0.16 -12.96, L 181.62 154.42, l -47.86 20.55, l 0.16 12.96
-       , l -5.9 2.53, M 676.89 379.4, l -4.7 2.02, M 283.03 408.44, l -0.87 -71.85, M 347.58 366.86, l 0.87 71.85, l 47.86 -20.55, M 395.96 389.24
-       , l 0.35 28.91, l 124.19 57.46, M 282.32 349.55, l 65.42 30.27, l 14.44 -6.2, M 53.95 218.11, l 521.53 241.32, l 20.46 0.07, l 58.87 -25.28, M 54.1 231.06
-       , l 521.53 241.32, l 20.46 0.07, l 362.54 -155.69, M 520.14 446.71, l 0.87 71.85, M 654.96 447.18, l -0.16 -12.96, L 113.42 183.71, l -59.59 25.63
-       , l 1.3 106.52, l 521.53 241.32, l 20.46 0.07, l 37.33 -16.03, l -0.87 -71.85, M 743.33 494.47, l -0.87 -71.85, M 662.38 457.01, l 80.95 37.46
-       , l 69.4 -29.8, l -0.87 -71.85, M 676.82 450.81, l 66.36 30.7, l 69.4 -29.8, M 520.3 459.66, l 55.49 25.68, l 20.45 0.07, l 362.54 -155.69
-       ]
--}
