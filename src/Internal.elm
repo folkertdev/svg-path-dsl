@@ -24,19 +24,74 @@ type CurveContinuation
     | CubiRelative Point Point
 
 
-formatCurveContinuation continuation =
+{-| gives a string representation of a float with at most `i` decimal places.
+-}
+fixed : Int -> Float -> String
+fixed i n =
+    let
+        pow =
+            10 ^ i
+
+        nInt =
+            round (n * pow)
+    in
+        toString (toFloat (nInt) / pow)
+
+
+roundToAtMost : Maybe Int -> Float -> String
+roundToAtMost doRound =
+    case doRound of
+        Nothing ->
+            toString
+
+        Just n ->
+            fixed n
+
+
+formatPoint : Maybe Int -> Point -> String
+formatPoint dp ( x, y ) =
+    roundToAtMost dp x ++ "," ++ roundToAtMost dp y
+
+
+letterAndFloat : Maybe Int -> String -> Float -> String
+letterAndFloat dp letter num =
+    letter ++ roundToAtMost dp num
+
+
+letterAndPoint : Maybe Int -> String -> Point -> String
+letterAndPoint dp letter point =
+    letter ++ formatPoint dp point
+
+
+letterAndPoints : Maybe Int -> String -> List Point -> String
+letterAndPoints dp letter points =
+    letter ++ String.join " " (List.map (formatPoint dp) points)
+
+
+letterAndPoint2 : Maybe Int -> String -> Point -> Point -> String
+letterAndPoint2 dp letter p1 p2 =
+    letter ++ formatPoint dp p1 ++ " " ++ formatPoint dp p2
+
+
+letterAndPoint3 : Maybe Int -> String -> Point -> Point -> Point -> String
+letterAndPoint3 dp letter p1 p2 p3 =
+    letter ++ formatPoint dp p1 ++ " " ++ formatPoint dp p2 ++ " " ++ formatPoint dp p3
+
+
+formatCurveContinuation : Maybe Int -> CurveContinuation -> String
+formatCurveContinuation dp continuation =
     case continuation of
         QuadAbsolute goal ->
-            "T" ++ formatPoint goal
+            letterAndPoint dp "T" goal
 
         QuadRelative goal ->
-            "t" ++ formatPoint goal
+            letterAndPoint dp "t" goal
 
         CubiAbsolute control goal ->
-            "S" ++ formatPoints [ control, goal ]
+            letterAndPoint2 dp "S" control goal
 
         CubiRelative control goal ->
-            "s" ++ formatPoints [ control, goal ]
+            letterAndPoint2 dp "s" control goal
 
 
 type Segment
@@ -67,13 +122,7 @@ type Segment
     | CubicRelativeMany Point Point Point (List CurveContinuation)
       -- arcs
     | ArcTo Point Float ( ArcFlag, Direction ) Point
-
-
-formatPoints =
-    -- List.foldl (\elem accum -> accum ++ formatPoint elem) ""
-    -- optimize this again, beware of trailing/preceding spaces
-    List.map formatPoint
-        >> String.join " "
+    | ArcBy Point Float ( ArcFlag, Direction ) Point
 
 
 concatMapString : (a -> String) -> List a -> String
@@ -81,73 +130,74 @@ concatMapString f =
     List.foldl (\e accum -> accum ++ (f e)) ""
 
 
-formatSegment segment =
+formatSegment : Maybe Int -> Segment -> String
+formatSegment dp segment =
     case segment of
         ClosePath ->
             "Z"
 
         MoveAbsolute point ->
-            "M" ++ formatPoint point
+            letterAndPoint dp "M" point
 
         MoveAbsoluteMany points ->
-            "M" ++ formatPoints points
+            letterAndPoints dp "M" points
 
         MoveRelative point ->
-            "m" ++ formatPoint point
+            letterAndPoint dp "m" point
 
         MoveRelativeMany points ->
-            "m" ++ formatPoints points
+            letterAndPoints dp "m" points
 
         LineAbsolute point ->
-            "L" ++ formatPoint point
+            letterAndPoint dp "L" point
 
         LineAbsoluteMany points ->
-            "L" ++ formatPoints points
+            letterAndPoints dp "L" points
 
         LineRelative point ->
-            "l" ++ formatPoint point
+            letterAndPoint dp "l" point
 
         LineRelativeMany points ->
-            "l" ++ formatPoints points
+            letterAndPoints dp "l" points
 
         VerticalAbsolute y ->
-            "V" ++ toString y
+            letterAndFloat dp "V" y
 
         VerticalRelative dy ->
-            "v" ++ toString dy
+            letterAndFloat dp "v" dy
 
         HorizontalAbsolute x ->
-            "H" ++ toString x
+            letterAndFloat dp "H" x
 
         HorizontalRelative dx ->
-            "h" ++ toString dx
+            letterAndFloat dp "h" dx
 
-        QuadraticAbsolute ( cx, cy ) ( x, y ) ->
-            "Q" ++ formatPoint ( cx, cy ) ++ " " ++ formatPoint ( x, y )
+        QuadraticAbsolute control goal ->
+            letterAndPoint2 dp "Q" control goal
 
-        QuadraticRelative ( dcx, dcy ) ( dx, dy ) ->
-            "q" ++ formatPoint ( dcx, dcy ) ++ " " ++ formatPoint ( dx, dy )
+        QuadraticRelative control goal ->
+            letterAndPoint2 dp "q" control goal
 
         CubicAbsolute c1 c2 point ->
             -- note that cubic == quadratic iff c1 == c2. Maybe optimize that?
-            "C" ++ String.join " " (List.map formatPoint [ c1, c2, point ])
+            letterAndPoint3 dp "C" c1 c2 point
 
         CubicRelative dc1 dc2 dpoint ->
-            "c" ++ String.join " " (List.map formatPoint [ dc1, dc2, dpoint ])
+            letterAndPoint3 dp "c" dc1 dc2 dpoint
 
         QuadraticAbsoluteMany control goal continuations ->
-            formatSegment (QuadraticAbsolute control goal) ++ concatMapString formatCurveContinuation continuations
+            formatSegment dp (QuadraticAbsolute control goal) ++ concatMapString (formatCurveContinuation dp) continuations
 
         QuadraticRelativeMany dcontrol dgoal continuations ->
-            formatSegment (QuadraticRelative dcontrol dgoal) ++ concatMapString formatCurveContinuation continuations
+            formatSegment dp (QuadraticRelative dcontrol dgoal) ++ concatMapString (formatCurveContinuation dp) continuations
 
         CubicAbsoluteMany c1 c2 goal continuations ->
-            formatSegment (CubicAbsolute c1 c2 goal) ++ concatMapString formatCurveContinuation continuations
+            formatSegment dp (CubicAbsolute c1 c2 goal) ++ concatMapString (formatCurveContinuation dp) continuations
 
         CubicRelativeMany dc1 dc2 dgoal continuations ->
-            formatSegment (CubicRelative dc1 dc2 dgoal) ++ concatMapString formatCurveContinuation continuations
+            formatSegment dp (CubicRelative dc1 dc2 dgoal) ++ concatMapString (formatCurveContinuation dp) continuations
 
-        ArcTo radii xAxisRotate ( arcFlag, sweepFlag ) goal ->
+        ArcTo ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
             let
                 arc : String
                 arc =
@@ -167,7 +217,29 @@ formatSegment segment =
                         Clockwise ->
                             "1"
             in
-                String.join " " [ "A" ++ formatPoint radii, toString xAxisRotate, arc ++ "," ++ sweep, formatPoint goal ]
+                "A" ++ formatPoint dp ( rx, ry ) ++ " " ++ roundToAtMost dp xAxisRotate ++ " " ++ arc ++ "," ++ sweep ++ " " ++ formatPoint dp ( x, y )
+
+        ArcBy ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
+            let
+                arc : String
+                arc =
+                    case arcFlag of
+                        Smallest ->
+                            "0"
+
+                        Largest ->
+                            "1"
+
+                sweep : String
+                sweep =
+                    case sweepFlag of
+                        AntiClockwise ->
+                            "0"
+
+                        Clockwise ->
+                            "1"
+            in
+                "a" ++ formatPoint dp ( rx, ry ) ++ " " ++ roundToAtMost dp xAxisRotate ++ " " ++ arc ++ "," ++ sweep ++ " " ++ formatPoint dp ( x, y )
 
 
 {-|
@@ -184,17 +256,3 @@ Also called 'sweepflag'. Clockwise (1) or anti-clockwise (0) direction
 type Direction
     = AntiClockwise
     | Clockwise
-
-
-points =
-    [ ( 2, 2 ), ( 4, 4 ), ( 5, 5 ), ( 50, 50 ) ]
-
-
-concat : Segment -> Segment -> List Segment
-concat instrA instrB =
-    [ instrA, instrB ]
-
-
-formatPoint : Point -> String
-formatPoint ( x, y ) =
-    toString x ++ "," ++ toString y
