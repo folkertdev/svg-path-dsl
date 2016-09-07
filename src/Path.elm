@@ -9,6 +9,8 @@ module Path
           -- line
         , lineTo
         , lineBy
+        , lineToMany
+        , lineByMany
         , verticalTo
         , verticalBy
         , horizontalTo
@@ -41,10 +43,22 @@ module Path
 
 {-| A Domain-specific language for SVG paths.
 
-The naming convention used in this package is that `*To` is the absolute version (capital in path syntax) and `*By` is the
-relative version (lowercase in path syntax).
+The path syntax is a minimal syntax to describe SVG paths in 2D space. It looks a bit like assembly and is hard to
+read. That is the problem this module solves. Here are some resources to learn more about
+ [`<path>` elements](https://developer.mozilla.org/en/docs/Web/SVG/Tutorial/Paths)
+ and the [`d` attribute syntax](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d).
 
-To learn what these commands do exactly and visually, [MDN has an excellent tutorial](https://developer.mozilla.org/en/docs/Web/SVG/Tutorial/Paths).
+**Conventions**
+
+* To distinguish between absolute (capital letters, like `M20,20`) and relative (lowercase letters, like `m20,20`) instructions,
+this module uses a `To` suffix for absolute commands and a `By` suffix for relative commands.
+
+* When a function takes multiple `Point` arguments, the final point is always `(x, y)` for absolute or `(dx, dy)` for relative.
+Other `Point` arguments have function-specific uses. Curves use them for control points, arcs for describing and ellipse's radii.
+
+* Functions with a `Many` suffix take a list of arguments and will try to merge them into one instruction. For example
+    `[ moveTo (20, 20), moveTo (40, 40) ]` produces `M20,20 M40,40`, but `[ moveToMany [ (20, 20), (40, 40) ] ]` will produce
+    `M20,20 40,40`. The generated path will look the same in both cases.
 
 #Conversion
 
@@ -56,14 +70,11 @@ from float to string.
 
 #Move
 @docs moveTo, moveBy
-
-The many variants take a list of points to move to. For generating many moves, this function is more efficient and
-the resulting `d` attribute string is shorter.
-
 @docs moveToMany, moveByMany
 
 #Line
-@docs lineTo, lineBy, verticalTo, verticalBy, horizontalTo, horizontalBy
+@docs lineTo, lineBy, lineToMany, lineByMany
+@docs verticalTo, verticalBy, horizontalTo, horizontalBy
 
 #Arc
 Arcs are segments of ellipses. The arc command describes an ellips and what segment of that elips to draw.
@@ -81,6 +92,7 @@ For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http
 
 #Quadratic Curve
 Quadratic curves are defined by a control point and a goal point.
+An interactive demo is available [here](http://blogs.sitepointstatic.com/examples/tech/svg-curves/quadratic-curve.html).
 @docs quadraticTo, quadraticBy, quadraticToMany, quadraticByMany
 
 #Cubic Curve
@@ -151,8 +163,13 @@ moveTo ( x, y ) =
     MoveAbsolute ( x, y )
 
 
-{-| Equivalent of moveTo that takes a list of points and moves
-to them in order.
+{-| Equivalent of moveTo that takes a list of points. It holds that:
+
+    [ moveTo (20, 20), moveTo (40, 40) ]
+        == [ moveToMany [ (20, 20), (40, 40) ] ]
+
+For a large number of points this function is more convenient,
+faster and the resulting string will be shorter.
 -}
 moveToMany : List Point -> Segment
 moveToMany =
@@ -163,11 +180,17 @@ moveToMany =
 is drawn from the current to the new location.
 -}
 moveBy : Point -> Segment
-moveBy ( dx, dy ) =
-    MoveRelative ( dx, dy )
+moveBy =
+    MoveRelative
 
 
-{-| Equivalent of moveBy that takes a list of (dx, dy) pairs.
+{-| Equivalent of moveBy that takes a list of (dx, dy) pairs. It holds that:
+
+    [ moveBy (20, 20), moveBy (40, 40) ]
+        == [ moveByMany [ (20, 20), (40, 40) ] ]
+
+For a large number of points this function is more convenient,
+faster and the resulting string will be shorter.
 -}
 moveByMany : List Point -> Segment
 moveByMany =
@@ -189,6 +212,13 @@ lineTo ( x, y ) =
     LineAbsolute ( x, y )
 
 
+{-|
+-}
+lineToMany : List Point -> Segment
+lineToMany =
+    LineAbsoluteMany
+
+
 {-| Draw a line from the current cursor position to a position relative
 to the current position.
 
@@ -203,6 +233,13 @@ to the current position.
 lineBy : Point -> Segment
 lineBy ( dx, dy ) =
     LineRelative ( dx, dy )
+
+
+{-|
+-}
+lineByMany : List Point -> Segment
+lineByMany =
+    LineRelativeMany
 
 
 {-| Draw a straight line from the current cursor position to the given y coordinate.
