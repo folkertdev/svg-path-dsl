@@ -149,9 +149,9 @@ view model =
 
         makeArcPath start radius rotation ( arc, sweep ) goal =
             Svg.path
-                [ Svg.Path.segmentsToAttribute Nothing
-                    [ moveTo start
-                    , arcTo radius rotation ( arc, sweep ) goal
+                [ Svg.Path.pathToAttribute
+                    [ subpath (moveBy start) open <|
+                        [ arcTo radius rotation ( arc, sweep ) goal ]
                     ]
                 , stroke (arcColor arc sweep)
                 , Svg.Attributes.id "arc"
@@ -211,6 +211,11 @@ view model =
                 , field "largeArcFlag: " <| checkbox (\v model -> { model | largeArcFlag = choice v largestArc smallestArc })
                 , field "sweepFlag:    " <| checkbox (\v model -> { model | sweepFlag = choice v clockwise antiClockwise })
                 , text ("model: " ++ toString model)
+                , text <|
+                    pathToString <|
+                        [ subpath (startAt ( 100, 100 )) closed <|
+                            [ arcTo ( 50, 70 ) 0 ( largestArc, clockwise ) ( 200, 100 ) ]
+                        ]
                 ]
     in
         Html.div []
