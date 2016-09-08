@@ -6,17 +6,12 @@ import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
 
-{-| A sequence of segments. New elements are added at the front, so the internal
-representation is reversed.
--}
-type alias Path =
-    List Segment
-
-
 type alias Point =
     ( Float, Float )
 
 
+{-| the T, t, S and s commands
+-}
 type CurveContinuation
     = QuadAbsolute Point
     | QuadRelative Point
@@ -24,77 +19,9 @@ type CurveContinuation
     | CubiRelative Point Point
 
 
-{-| gives a string representation of a float with at most `i` decimal places.
+{-| SVG instructions
 -}
-fixed : Int -> Float -> String
-fixed i n =
-    let
-        pow =
-            10 ^ i
-
-        nInt =
-            round (n * pow)
-    in
-        toString (toFloat (nInt) / pow)
-
-
-roundToAtMost : Maybe Int -> Float -> String
-roundToAtMost doRound =
-    case doRound of
-        Nothing ->
-            toString
-
-        Just n ->
-            fixed n
-
-
-formatPoint : Maybe Int -> Point -> String
-formatPoint dp ( x, y ) =
-    roundToAtMost dp x ++ "," ++ roundToAtMost dp y
-
-
-letterAndFloat : Maybe Int -> String -> Float -> String
-letterAndFloat dp letter num =
-    letter ++ roundToAtMost dp num
-
-
-letterAndPoint : Maybe Int -> String -> Point -> String
-letterAndPoint dp letter point =
-    letter ++ formatPoint dp point
-
-
-letterAndPoints : Maybe Int -> String -> List Point -> String
-letterAndPoints dp letter points =
-    letter ++ String.join " " (List.map (formatPoint dp) points)
-
-
-letterAndPoint2 : Maybe Int -> String -> Point -> Point -> String
-letterAndPoint2 dp letter p1 p2 =
-    letter ++ formatPoint dp p1 ++ " " ++ formatPoint dp p2
-
-
-letterAndPoint3 : Maybe Int -> String -> Point -> Point -> Point -> String
-letterAndPoint3 dp letter p1 p2 p3 =
-    letter ++ formatPoint dp p1 ++ " " ++ formatPoint dp p2 ++ " " ++ formatPoint dp p3
-
-
-formatCurveContinuation : Maybe Int -> CurveContinuation -> String
-formatCurveContinuation dp continuation =
-    case continuation of
-        QuadAbsolute goal ->
-            letterAndPoint dp "T" goal
-
-        QuadRelative goal ->
-            letterAndPoint dp "t" goal
-
-        CubiAbsolute control goal ->
-            letterAndPoint2 dp "S" control goal
-
-        CubiRelative control goal ->
-            letterAndPoint2 dp "s" control goal
-
-
-type Segment
+type Instruction
     = ClosePath
       -- move (*many versions for optimization)
     | MoveAbsolute Point
@@ -130,116 +57,158 @@ concatMapString f =
     List.foldl (\e accum -> accum ++ (f e)) ""
 
 
-formatSegment : Maybe Int -> Segment -> String
-formatSegment dp segment =
-    case segment of
-        ClosePath ->
-            "Z"
+formatInstruction : Maybe Int -> Instruction -> String
+formatInstruction dp segment =
+    let
+        formatPoint =
+            formatPointWithPrecision dp
 
-        MoveAbsolute point ->
-            letterAndPoint dp "M" point
+        doRound =
+            roundToAtMost dp
 
-        MoveAbsoluteMany points ->
-            letterAndPoints dp "M" points
+        letterAndFloat : String -> Float -> String
+        letterAndFloat letter num =
+            letter ++ doRound num
 
-        MoveRelative point ->
-            letterAndPoint dp "m" point
+        letterAndPoint : String -> Point -> String
+        letterAndPoint letter point =
+            letter ++ formatPoint point
 
-        MoveRelativeMany points ->
-            letterAndPoints dp "m" points
+        letterAndPoints : String -> List Point -> String
+        letterAndPoints letter points =
+            letter ++ String.join " " (List.map formatPoint points)
 
-        LineAbsolute point ->
-            letterAndPoint dp "L" point
+        letterAndPoint2 : String -> Point -> Point -> String
+        letterAndPoint2 letter p1 p2 =
+            letter ++ formatPoint p1 ++ " " ++ formatPoint p2
 
-        LineAbsoluteMany points ->
-            letterAndPoints dp "L" points
+        letterAndPoint3 : String -> Point -> Point -> Point -> String
+        letterAndPoint3 letter p1 p2 p3 =
+            letter ++ formatPoint p1 ++ " " ++ formatPoint p2 ++ " " ++ formatPoint p3
 
-        LineRelative point ->
-            letterAndPoint dp "l" point
+        formatCurveContinuation : CurveContinuation -> String
+        formatCurveContinuation continuation =
+            case continuation of
+                QuadAbsolute goal ->
+                    letterAndPoint "T" goal
 
-        LineRelativeMany points ->
-            letterAndPoints dp "l" points
+                QuadRelative goal ->
+                    letterAndPoint "t" goal
 
-        VerticalAbsolute y ->
-            letterAndFloat dp "V" y
+                CubiAbsolute control goal ->
+                    letterAndPoint2 "S" control goal
 
-        VerticalRelative dy ->
-            letterAndFloat dp "v" dy
+                CubiRelative control goal ->
+                    letterAndPoint2 "s" control goal
+    in
+        case segment of
+            ClosePath ->
+                "Z"
 
-        HorizontalAbsolute x ->
-            letterAndFloat dp "H" x
+            MoveAbsolute point ->
+                letterAndPoint "M" point
 
-        HorizontalRelative dx ->
-            letterAndFloat dp "h" dx
+            MoveAbsoluteMany points ->
+                letterAndPoints "M" points
 
-        QuadraticAbsolute control goal ->
-            letterAndPoint2 dp "Q" control goal
+            MoveRelative point ->
+                letterAndPoint "m" point
 
-        QuadraticRelative control goal ->
-            letterAndPoint2 dp "q" control goal
+            MoveRelativeMany points ->
+                letterAndPoints "m" points
 
-        CubicAbsolute c1 c2 point ->
-            -- note that cubic == quadratic iff c1 == c2. Maybe optimize that?
-            letterAndPoint3 dp "C" c1 c2 point
+            LineAbsolute point ->
+                letterAndPoint "L" point
 
-        CubicRelative dc1 dc2 dpoint ->
-            letterAndPoint3 dp "c" dc1 dc2 dpoint
+            LineAbsoluteMany points ->
+                letterAndPoints "L" points
 
-        QuadraticAbsoluteMany control goal continuations ->
-            formatSegment dp (QuadraticAbsolute control goal) ++ concatMapString (formatCurveContinuation dp) continuations
+            LineRelative point ->
+                letterAndPoint "l" point
 
-        QuadraticRelativeMany dcontrol dgoal continuations ->
-            formatSegment dp (QuadraticRelative dcontrol dgoal) ++ concatMapString (formatCurveContinuation dp) continuations
+            LineRelativeMany points ->
+                letterAndPoints "l" points
 
-        CubicAbsoluteMany c1 c2 goal continuations ->
-            formatSegment dp (CubicAbsolute c1 c2 goal) ++ concatMapString (formatCurveContinuation dp) continuations
+            VerticalAbsolute y ->
+                letterAndFloat "V" y
 
-        CubicRelativeMany dc1 dc2 dgoal continuations ->
-            formatSegment dp (CubicRelative dc1 dc2 dgoal) ++ concatMapString (formatCurveContinuation dp) continuations
+            VerticalRelative dy ->
+                letterAndFloat "v" dy
 
-        ArcTo ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
-            let
-                arc : String
-                arc =
-                    case arcFlag of
-                        Smallest ->
-                            "0"
+            HorizontalAbsolute x ->
+                letterAndFloat "H" x
 
-                        Largest ->
-                            "1"
+            HorizontalRelative dx ->
+                letterAndFloat "h" dx
 
-                sweep : String
-                sweep =
-                    case sweepFlag of
-                        AntiClockwise ->
-                            "0"
+            QuadraticAbsolute control goal ->
+                letterAndPoint2 "Q" control goal
 
-                        Clockwise ->
-                            "1"
-            in
-                "A" ++ formatPoint dp ( rx, ry ) ++ " " ++ roundToAtMost dp xAxisRotate ++ " " ++ arc ++ "," ++ sweep ++ " " ++ formatPoint dp ( x, y )
+            QuadraticRelative control goal ->
+                letterAndPoint2 "q" control goal
 
-        ArcBy ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
-            let
-                arc : String
-                arc =
-                    case arcFlag of
-                        Smallest ->
-                            "0"
+            CubicAbsolute c1 c2 point ->
+                -- note that cubic == quadratic iff c1 == c2. Maybe optimize that?
+                letterAndPoint3 "C" c1 c2 point
 
-                        Largest ->
-                            "1"
+            CubicRelative dc1 dc2 dpoint ->
+                letterAndPoint3 "c" dc1 dc2 dpoint
 
-                sweep : String
-                sweep =
-                    case sweepFlag of
-                        AntiClockwise ->
-                            "0"
+            QuadraticAbsoluteMany control goal continuations ->
+                formatInstruction dp (QuadraticAbsolute control goal) ++ concatMapString formatCurveContinuation continuations
 
-                        Clockwise ->
-                            "1"
-            in
-                "a" ++ formatPoint dp ( rx, ry ) ++ " " ++ roundToAtMost dp xAxisRotate ++ " " ++ arc ++ "," ++ sweep ++ " " ++ formatPoint dp ( x, y )
+            QuadraticRelativeMany dcontrol dgoal continuations ->
+                formatInstruction dp (QuadraticRelative dcontrol dgoal) ++ concatMapString formatCurveContinuation continuations
+
+            CubicAbsoluteMany c1 c2 goal continuations ->
+                formatInstruction dp (CubicAbsolute c1 c2 goal) ++ concatMapString formatCurveContinuation continuations
+
+            CubicRelativeMany dc1 dc2 dgoal continuations ->
+                formatInstruction dp (CubicRelative dc1 dc2 dgoal) ++ concatMapString formatCurveContinuation continuations
+
+            ArcTo ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
+                let
+                    arc : String
+                    arc =
+                        case arcFlag of
+                            Smallest ->
+                                "0"
+
+                            Largest ->
+                                "1"
+
+                    sweep : String
+                    sweep =
+                        case sweepFlag of
+                            AntiClockwise ->
+                                "0"
+
+                            Clockwise ->
+                                "1"
+                in
+                    "A" ++ formatPoint ( rx, ry ) ++ " " ++ doRound xAxisRotate ++ " " ++ arc ++ "," ++ sweep ++ " " ++ formatPoint ( x, y )
+
+            ArcBy ( rx, ry ) xAxisRotate ( arcFlag, sweepFlag ) ( x, y ) ->
+                let
+                    arc : String
+                    arc =
+                        case arcFlag of
+                            Smallest ->
+                                "0"
+
+                            Largest ->
+                                "1"
+
+                    sweep : String
+                    sweep =
+                        case sweepFlag of
+                            AntiClockwise ->
+                                "0"
+
+                            Clockwise ->
+                                "1"
+                in
+                    "a" ++ formatPoint ( rx, ry ) ++ " " ++ doRound xAxisRotate ++ " " ++ arc ++ "," ++ sweep ++ " " ++ formatPoint ( x, y )
 
 
 {-|
@@ -256,3 +225,32 @@ Also called 'sweepflag'. Clockwise (1) or anti-clockwise (0) direction
 type Direction
     = AntiClockwise
     | Clockwise
+
+
+{-| gives a string representation of a float with at most `i` decimal places.
+-}
+fixed : Int -> Float -> String
+fixed i n =
+    let
+        pow =
+            10 ^ i
+
+        nInt =
+            round (n * pow)
+    in
+        toString (toFloat (nInt) / pow)
+
+
+roundToAtMost : Maybe Int -> Float -> String
+roundToAtMost doRound =
+    case doRound of
+        Nothing ->
+            toString
+
+        Just n ->
+            fixed n
+
+
+formatPointWithPrecision : Maybe Int -> Point -> String
+formatPointWithPrecision dp ( x, y ) =
+    roundToAtMost dp x ++ "," ++ roundToAtMost dp y

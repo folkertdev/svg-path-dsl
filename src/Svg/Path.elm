@@ -1,11 +1,23 @@
 module Svg.Path
     exposing
-        ( close
+        ( Path
+        , Subpath
+        , subpath
+        , Instruction
+        , Point
+        , StartingPoint
+        , CloseOption
+        , closed
+        , open
+          -- conversion
+        , pathToString
+        , pathToStringWithPrecision
+        , pathToAttribute
+          -- close (Z)
+        , close
           -- move
-        , moveTo
+        , startAt
         , moveBy
-        , moveToMany
-        , moveByMany
           -- line
         , lineTo
         , lineBy
@@ -36,15 +48,9 @@ module Svg.Path
         , quadraticContinueBy
         , cubicContinueTo
         , cubicContinueBy
-          -- conversions
-        , segmentToString
-        , segmentsToString
-        , segmentsToAttribute
           -- types
         , ArcFlag
         , Direction
-        , Segment
-        , Point
         )
 
 {-| A Domain-specific language for SVG paths.
@@ -62,24 +68,17 @@ this module uses a `To` suffix for absolute commands and a `By` suffix for relat
 * When a function takes multiple `Point` arguments, the final point is always `(x, y)` for absolute or `(dx, dy)` for relative.
 Other `Point` arguments have function-specific uses. Curves use them for control points, arcs for describing and ellipse's radii.
 
-* Functions with a `Many` suffix take a list of arguments and will try to merge them into one instruction. For example
-    `[ moveTo (20, 20), moveTo (40, 40) ]` produces `M20,20 M40,40`, but `[ moveToMany [ (20, 20), (40, 40) ] ]` will produce
-    `M20,20 40,40`. The generated path will look the same in both cases.
+#Path
+@docs Path, Subpath, subpath, Instruction, Point
 
-#Types
-@docs Segment, Point
+#Converting
+@docs pathToString, pathToStringWithPrecision, pathToAttribute
 
-#Conversion
+#Starting a subpath
+@docs StartingPoint, startAt, moveBy
 
-Conversion from segments to string and attribute. All conversion functions take a `Maybe Int` argument that specifies
-the maximum number of decimals that a number in the output will have. `Nothing` will just use `toString` for the conversion
-from float to string.
-
-@docs segmentToString, segmentsToString, segmentsToAttribute
-
-#Move
-@docs moveTo, moveBy
-@docs moveToMany, moveByMany
+#Closing a subpath
+@docs CloseOption, closed, open
 
 #Line
 @docs lineTo, lineBy, lineToMany, lineByMany
@@ -95,8 +94,10 @@ The remaining argument is a pair of flags that select the part of the ellips to 
 For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
 
 @docs arcTo, arcBy
-@docs ArcFlag, Direction
-@docs largestArc, smallestArc, clockwise, antiClockwise
+##arc size
+@docs ArcFlag, largestArc, smallestArc
+##direction
+@docs Direction, clockwise, antiClockwise
 
 #Close
 @docs close
@@ -128,13 +129,107 @@ import Svg.Attributes exposing (..)
 import List.Extra as List
 
 
-{-| What direction to pick. See below for visual examples.
+{-| A path is a list of subpaths.
+-}
+type alias Path =
+    List Subpath
+
+
+{-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
+-}
+pathToString : Path -> String
+pathToString path =
+    instructionsToString Nothing (List.foldr subPathToInstructions [] path)
+
+
+{-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
+-}
+pathToAttribute : Path -> Svg.Attribute msg
+pathToAttribute path =
+    instructionsToString Nothing (List.foldr subPathToInstructions [] path)
+        |> Svg.Attributes.d
+
+
+subPathToInstructions : Subpath -> List Instruction -> List Instruction
+subPathToInstructions (Subpath (StartingPoint start) (CloseOption closePath) segments) accum =
+    if closePath then
+        (start :: segments) ++ (close :: accum)
+    else
+        (start :: segments) ++ accum
+
+
+{-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
+The first argument gives the maximum number of decimal places any number in the output will have.
+-}
+pathToStringWithPrecision : Int -> Path -> String
+pathToStringWithPrecision decimalPlaces path =
+    instructionsToString (Just decimalPlaces) (List.foldr subPathToInstructions [] path)
+
+
+{-| A subpath is a list of svg instructions with a starting point and a closing option.
+-}
+type Subpath
+    = Subpath StartingPoint CloseOption (List Instruction)
+
+
+{-| Construct a subpath from a starting point (`startAt (x, y)` or `moveBy (dx, dy)`), a closing option (`closed` or `open`)
+and a list of intructions.
+-}
+subpath : StartingPoint -> CloseOption -> List Instruction -> Subpath
+subpath =
+    Subpath
+
+
+{-| Starting point of a subpath.
+-}
+type StartingPoint
+    = StartingPoint Instruction
+
+
+{-| Start a subpath at the absolute coordinates `(x, y)`.
+-}
+startAt : Point -> StartingPoint
+startAt =
+    StartingPoint << MoveAbsolute
+
+
+{-| Start a subpath at the location given by
+moving the current location by `(dx, dy)`.
+-}
+moveBy : Point -> StartingPoint
+moveBy =
+    StartingPoint << MoveRelative
+
+
+{-| Close the subpath or not.
+-}
+type CloseOption
+    = CloseOption Bool
+
+
+{-| Create a closed subpath. After the final
+instruction, a line will be drawn from the current
+point to the starting point.
+-}
+closed : CloseOption
+closed =
+    CloseOption True
+
+
+{-| Create an open path.
+-}
+open : CloseOption
+open =
+    CloseOption False
+
+
+{-| What direction to pick. Also called "sweep flag".
 -}
 type alias Direction =
     Internal.Direction
 
 
-{-| What arc to pick. See below for visual examples.
+{-| What arc to pick.
 -}
 type alias ArcFlag =
     Internal.ArcFlag
@@ -142,19 +237,19 @@ type alias ArcFlag =
 
 {-| A single SVG instruction
 -}
-type alias Segment =
-    Internal.Segment
+type alias Instruction =
+    Internal.Instruction
 
 
-{-| Convert a segment to a string.
+{-| Convert an instruction to a string.
 
     segmentToString (Just 2) (moveTo ( 20.001, 20 ))
         == "M20,20"
     segmentToString Nothing close == "Z"
 -}
-segmentToString : Maybe Int -> Segment -> String
-segmentToString =
-    Internal.formatSegment
+instructionToString : Maybe Int -> Instruction -> String
+instructionToString =
+    Internal.formatInstruction
 
 
 {-| Convert a list of segments to string.
@@ -166,16 +261,16 @@ segmentToString =
         ]
             == "M20,20 L20,40 Z"
 -}
-segmentsToString : Maybe Int -> List Segment -> String
-segmentsToString maxNumOfDecimals =
-    String.join " " << List.map (Internal.formatSegment maxNumOfDecimals)
+instructionsToString : Maybe Int -> List Instruction -> String
+instructionsToString maxNumOfDecimals =
+    String.join " " << List.map (Internal.formatInstruction maxNumOfDecimals)
 
 
 {-| Helper to convert a list of segments directly to an SVG attribute.
 -}
-segmentsToAttribute : Maybe Int -> List Segment -> Svg.Attribute msg
-segmentsToAttribute maxNumOfDecimals =
-    Svg.Attributes.d << segmentsToString maxNumOfDecimals
+instructionsToAttribute : Maybe Int -> List Instruction -> Svg.Attribute msg
+instructionsToAttribute maxNumOfDecimals =
+    Svg.Attributes.d << instructionsToString maxNumOfDecimals
 
 
 {-| A 2-tuple of Floats. Used to store a `(x, y)` absolute or `(dx, dy)` relative coordinate.
@@ -184,66 +279,35 @@ type alias Point =
     ( Float, Float )
 
 
-{-| Move the cursor to a point in 2D space. No line is drawn between the
-current and the new location.
--}
-moveTo : Point -> Segment
-moveTo ( x, y ) =
-    MoveAbsolute ( x, y )
-
-
-{-| Equivalent of moveTo that takes a list of points. It holds that:
-
-    [ moveTo (20, 20), moveTo (40, 40) ]
-        == [ moveToMany [ (20, 20), (40, 40) ] ]
-
-For a large number of points this function is more convenient,
-faster and the resulting string will be shorter.
--}
-moveToMany : List Point -> Segment
-moveToMany =
-    MoveAbsoluteMany
-
-
-{-| Move the cursor relative to its current position. No line
-is drawn from the current to the new location.
--}
-moveBy : Point -> Segment
-moveBy =
-    MoveRelative
-
-
-{-| Equivalent of moveBy that takes a list of (dx, dy) pairs. It holds that:
-
-    [ moveBy (20, 20), moveBy (40, 40) ]
-        == [ moveByMany [ (20, 20), (40, 40) ] ]
-
-For a large number of points this function is more convenient,
-faster and the resulting string will be shorter.
--}
-moveByMany : List Point -> Segment
-moveByMany =
-    MoveRelativeMany
-
-
 {-| Draw a line from the current cursor position to a point in 2D space.
 
+The code below draws a cube using absolute coordinates
+
     cubeAbsolute =
-        [ moveTo ( 20, 20 )
-        , lineTo ( 40, 20 )
-        , lineTo ( 40, 40 )
-        , lineTo ( 20, 40 )
-        , lineTo ( 20, 20 )
-        ]
+        subpath (startAt (0, 0)) open <|
+            [ lineTo ( 40, 20 )
+            , lineTo ( 40, 40 )
+            , lineTo ( 20, 40 )
+            , lineTo ( 20, 20 )
+            ]
 -}
-lineTo : Point -> Segment
+lineTo : Point -> Instruction
 lineTo =
     LineAbsolute
 
 
-{-|
+{-| Join many `lineTo`s into one instruction.
+
+    [ lineTo (20, 20), lineTo (40, 40)  ]
+    [ lineToMany [ (20, 20), (40, 40) ] ]
+    -- will respectively produce
+    "L20,20 L40,40"
+    "L20,20  40,40"
+
+Using `lineToMany` is convenient, more efficient and produces
+shorter SVG.
 -}
-lineToMany : List Point -> Segment
+lineToMany : List Point -> Instruction
 lineToMany =
     LineAbsoluteMany
 
@@ -251,62 +315,77 @@ lineToMany =
 {-| Draw a line from the current cursor position to a position relative
 to the current position.
 
+The code below draws a cube using absolute coordinates
+
     cubeRelative =
-        [ moveTo ( 20, 20 )
-        , lineBy ( 20, 0 )
-        , lineBy ( 0, 20 )
-        , lineBy ( -20, 0 )
-        , lineBy ( 0, -20 )
-        ]
+        subpath (startAt (0, 0)) open <|
+            [ lineBy ( 20, 0 )
+            , lineBy ( 0, 20 )
+            , lineBy ( -20, 0 )
+            , lineBy ( 0, -20 )
+            ]
 -}
-lineBy : Point -> Segment
+lineBy : Point -> Instruction
 lineBy =
     LineRelative
 
 
-{-|
+{-| Relative version of `lineToMany`.
 -}
-lineByMany : List Point -> Segment
+lineByMany : List Point -> Instruction
 lineByMany =
     LineRelativeMany
 
 
 {-| Draw a straight line from the current cursor position to the given y coordinate.
 -}
-verticalTo : Float -> Segment
+verticalTo : Float -> Instruction
 verticalTo =
     VerticalAbsolute
 
 
 {-| Draw a straight vertical line from the current cursor position of the given length.
 -}
-verticalBy : Float -> Segment
+verticalBy : Float -> Instruction
 verticalBy =
     VerticalRelative
 
 
 {-| Draw a straight line from the current cursor position to the given x coordinate.
 -}
-horizontalTo : Float -> Segment
+horizontalTo : Float -> Instruction
 horizontalTo =
     HorizontalAbsolute
 
 
 {-| Draw a straight horizontal line from the current cursor position of the given length.
 -}
-horizontalBy : Float -> Segment
+horizontalBy : Float -> Instruction
 horizontalBy =
     HorizontalRelative
 
 
-{-| -}
-arcTo : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Segment
+{-|
+    subpath (startAt ( 100, 100 )) closed <|
+        [ arcTo ( 50, 70 ) 0
+                ( largestArc, clockwise ) ( 200, 100 )
+        ]
+
+
+Produces `M100,100 A50,70 0 1,1 200,100 Z` which displays as
+<svg width="100%" height="100px" id="svgcontext">
+    <path           d="M100,100 A50,70 0 1,1 200,100 Z" fill="none" stroke="black" stroke-width="2"></path>
+</svg>
+
+-}
+arcTo : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Instruction
 arcTo radius xstartangle ( largeArcFlag, sweepFlag ) point =
     ArcTo radius xstartangle ( largeArcFlag, sweepFlag ) point
 
 
-{-| -}
-arcBy : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Segment
+{-| Relative version of `arcTo`.
+-}
+arcBy : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Instruction
 arcBy radius xstartangle ( largeArcFlag, direction ) point =
     ArcBy radius xstartangle ( largeArcFlag, direction ) point
 
@@ -426,7 +505,7 @@ smallestArc =
 </svg>
 
 -}
-close : Segment
+close : Instruction
 close =
     ClosePath
 
@@ -437,56 +516,56 @@ close =
 
 {-| Draw a quadratic curve from the current cursor position to the
 -}
-quadraticTo : Point -> Point -> Segment
+quadraticTo : Point -> Point -> Instruction
 quadraticTo control point =
     QuadraticAbsolute control point
 
 
 {-|
 -}
-quadraticBy : Point -> Point -> Segment
+quadraticBy : Point -> Point -> Instruction
 quadraticBy dcontrol dpoint =
     QuadraticRelative dcontrol dpoint
 
 
 {-|
 -}
-quadraticToMany : Point -> Point -> List CurveContinuation -> Segment
+quadraticToMany : Point -> Point -> List CurveContinuation -> Instruction
 quadraticToMany =
     QuadraticAbsoluteMany
 
 
 {-|
 -}
-quadraticByMany : Point -> Point -> List CurveContinuation -> Segment
+quadraticByMany : Point -> Point -> List CurveContinuation -> Instruction
 quadraticByMany =
     QuadraticRelativeMany
 
 
 {-|
 -}
-cubicTo : Point -> Point -> Point -> Segment
+cubicTo : Point -> Point -> Point -> Instruction
 cubicTo control1 control2 point =
     CubicAbsolute control1 control2 point
 
 
 {-|
 -}
-cubicBy : Point -> Point -> Point -> Segment
+cubicBy : Point -> Point -> Point -> Instruction
 cubicBy dcontrol1 dcontrol2 dpoint =
     CubicRelative dcontrol1 dcontrol2 dpoint
 
 
 {-|
 -}
-cubicToMany : Point -> Point -> Point -> List CurveContinuation -> Segment
+cubicToMany : Point -> Point -> Point -> List CurveContinuation -> Instruction
 cubicToMany =
     CubicAbsoluteMany
 
 
 {-|
 -}
-cubicByMany : Point -> Point -> Point -> List CurveContinuation -> Segment
+cubicByMany : Point -> Point -> Point -> List CurveContinuation -> Instruction
 cubicByMany =
     CubicRelativeMany
 
