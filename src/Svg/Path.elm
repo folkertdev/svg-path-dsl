@@ -7,6 +7,7 @@ module Svg.Path
         , Point
         , StartingPoint
         , CloseOption
+        , CurveContinuation
         , closed
         , open
           -- conversion
@@ -14,7 +15,7 @@ module Svg.Path
         , pathToStringWithPrecision
         , pathToAttribute
           -- close (Z)
-        , close
+        , toStart
           -- move
         , startAt
         , moveBy
@@ -53,7 +54,7 @@ module Svg.Path
         , Direction
         )
 
-{-| A Domain-specific language for SVG paths.
+{-| A domain-specific language for SVG paths.
 
 The path syntax is a minimal syntax to describe SVG paths in 2D space. It looks a bit like assembly and is hard to
 read. That is the problem this module solves. Here are some resources to learn more about
@@ -62,11 +63,11 @@ read. That is the problem this module solves. Here are some resources to learn m
 
 **Conventions**
 
-* To distinguish between absolute (capital letters, like `M20,20`) and relative (lowercase letters, like `m20,20`) instructions,
+* To distinguish between absolute (capital letters, like `L20,20`) and relative (lowercase letters, like `l20,20`) instructions,
 this module uses a `To` suffix for absolute commands and a `By` suffix for relative commands.
 
 * When a function takes multiple `Point` arguments, the final point is always `(x, y)` for absolute or `(dx, dy)` for relative.
-Other `Point` arguments have function-specific uses. Curves use them for control points, arcs for describing and ellipse's radii.
+Only curves take multiple points that are used as control points.
 
 #Path
 @docs Path, Subpath, subpath, Instruction, Point
@@ -100,7 +101,7 @@ For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http
 @docs Direction, clockwise, antiClockwise
 
 #Close
-@docs close
+@docs toStart
 
 #Quadratic Curve
 Quadratic curves are defined by a control point and a goal point.
@@ -118,13 +119,20 @@ inferred from the current control point.
 
 **note: ** adding continuations after non-curve instructions is not illegal in svg, but this library makes it impossible.
 A continuation after a non-curve instruction should be replaced by `lineTo/lineBy`.
+@docs CurveContinuation
 @docs quadraticContinueTo, quadraticContinueBy, cubicContinueTo, cubicContinueBy
 -}
 
-import Svg.Path.Internal as Internal exposing (..)
+import Svg.Path.Internal as Internal
+    exposing
+        ( Instruction(..)
+        , CurveContinuation(..)
+        , Direction(..)
+        , ArcFlag(..)
+        )
 import String
 import Svg
-import Svg.Attributes exposing (..)
+import Svg.Attributes
 
 
 {-| A path is a list of subpaths.
@@ -151,7 +159,7 @@ pathToAttribute path =
 subPathToInstructions : Subpath -> List Instruction -> List Instruction
 subPathToInstructions (Subpath (StartingPoint start) (CloseOption closePath) segments) accum =
     if closePath then
-        (start :: segments) ++ (close :: accum)
+        (start :: segments) ++ (toStart :: accum)
     else
         (start :: segments) ++ accum
 
@@ -241,8 +249,8 @@ type alias Instruction =
 
 {-| Convert an instruction to a string.
 
-    segmentToString (Just 2) (moveTo ( 20.001, 20 ))
-        == "M20,20"
+    segmentToString (Just 2) (lineTo ( 20.001, 20 ))
+        == "L20,20"
     segmentToString Nothing close == "Z"
 -}
 instructionToString : Maybe Int -> Instruction -> String
@@ -253,8 +261,7 @@ instructionToString =
 {-| Convert a list of segments to string.
 
     segmentsToString Nothing
-        [ moveTo ( 20, 20 )
-        , lineTo ( 20, 40 )
+        [ lineTo ( 20, 40 )
         , close
         ]
             == "M20,20 L20,40 Z"
@@ -313,7 +320,7 @@ lineToMany =
 {-| Draw a line from the current cursor position to a position relative
 to the current position.
 
-The code below draws a cube using absolute coordinates
+The code below draws a cube using relative coordinates
 
     cubeRelative =
         subpath (startAt (0, 0)) open <|
@@ -364,15 +371,12 @@ horizontalBy =
 
 
 {-|
-    subpath (startAt ( 100, 100 )) closed <|
-        [ arcTo ( 50, 70 ) 0
-                ( largestArc, clockwise ) ( 200, 100 )
-        ]
+    [arcTo (50, 70) 0 (largestArc, clockwise) (200, 100)]
+        |> subpath (startAt ( 100, 100 )) open
 
-
-Produces `M100,100 A50,70 0 1,1 200,100 Z` which displays as
+Produces `M100,100 A50,70 0 1,1 200,100` which displays as
 <svg width="100%" height="100px" id="svgcontext">
-    <path           d="M100,100 A50,70 0 1,1 200,100 Z" fill="none" stroke="black" stroke-width="2"></path>
+    <path           d="M100,100 A50,70 0 1,1 200,100" fill="none" stroke="black" stroke-width="2"></path>
 </svg>
 
 -}
@@ -490,21 +494,36 @@ smallestArc =
     Smallest
 
 
-{-| Draws a line from the current position to the first point of the path.
+{-| Draws a line from the current position to the starting point of the subpath.
 
-`[ moveTo (100, 100), lineTo (200, 100), lineTo (150, 50) ]`
-<svg width="100%" height="100px" id="svgcontext">
-    <path id="arc2" d="M100 100 L200 100 L150 50" fill="red" stroke="black" stroke-width="5"></path>
+    subpath (startAt (0, 10)) open <|
+        [ lineTo (100, 10)
+        , lineTo (150, 110)
+        , lineTo (50, 110)
+        ]
+
+Yields
+
+<svg width="100%" height="120px" id="svgcontext">
+    <path id="arc2" d="M0,10 L100,10 L150,110 L50,110" fill="red" stroke="black" stroke-width="5"></path>
 </svg>
 
-`[ moveTo (100, 100), lineTo (200, 100), lineTo (150, 50), close ]`
-<svg width="100%" height="100px" id="svgcontext">
-    <path id="arc2" d="M100 100 L200 100 L150 50 Z" fill="red" stroke="black" stroke-width="5"></path>
+    subpath (startAt (0, 10)) open <|
+        [ lineTo (100, 10)
+        , lineTo (150, 110)
+        , toStart
+        , lineTo (50, 110)
+        ]
+
+Yields
+
+<svg width="100%" height="120px" id="svgcontext">
+    <path id="arc2" d="M0,10 L100,10 L150,110 Z L50,110" fill="red" stroke="black" stroke-width="5"></path>
 </svg>
 
 -}
-close : Instruction
-close =
+toStart : Instruction
+toStart =
     ClosePath
 
 
@@ -512,7 +531,15 @@ close =
 -- curve
 
 
-{-| Draw a quadratic curve from the current cursor position to the
+{-| Draws a curve between the current and the goal point. The position
+of the control point determines the path of the curve.
+
+    subpath (startAt (110, 10)) open
+        <| [ quadraticTo (10, 10) (10, 110) ]
+Yields
+<svg width="120px" height="120px" id="svgcontext">
+    <path d="M110,10 Q10,10 10,110" fill="none" stroke="black" stroke-width="5"></path>
+</svg>
 -}
 quadraticTo : Point -> Point -> Instruction
 quadraticTo control point =
@@ -568,6 +595,12 @@ cubicByMany =
     CubicRelativeMany
 
 
+{-| Extension of a curve by one point
+-}
+type alias CurveContinuation =
+    Internal.CurveContinuation
+
+
 {-| Extend a curve by a cubic point
 -}
 cubicContinueTo : Point -> Point -> CurveContinuation
@@ -584,13 +617,14 @@ cubicContinueBy =
 
 {-| Extend a curve by a quadratic point
 
-    [ moveTo ( 10, 40 )
-    , quadraticToMany ( 52.5, 100 ) ( 95, 40 ) <|
+    [ quadraticToMany ( 52.5, 100 ) ( 95, 40 ) <|
         List.map quadraticContinueTo
             [ ( 180, 40 )
             , ( 265, 40 )
             ]
     ]
+        |> subpath (startAt (10, 40)) open
+
     -- produces "M10,40  Q52.5,100  95,40 T180,40 T265,40"
 
 Creates
