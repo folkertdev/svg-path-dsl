@@ -123,10 +123,8 @@ A continuation after a non-curve instruction should be replaced by `lineTo/lineB
 
 import Svg.Path.Internal as Internal exposing (..)
 import String
-import Html
 import Svg
 import Svg.Attributes exposing (..)
-import List.Extra as List
 
 
 {-| A path is a list of subpaths.
