@@ -1,9 +1,9 @@
-module Svg.Path.Internal exposing (..)
+module Svg.Path.Internal exposing (Point, CurveContinuation(..), Instruction(..), Direction(..), ArcFlag(..))
 
 import String
 import Html
 import Svg exposing (..)
-import Svg.Attributes exposing (..)
+import Svg.Attributes
 
 
 type alias Point =
