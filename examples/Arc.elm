@@ -1,7 +1,6 @@
 module Arc exposing (..)
 
 {-| Interactive demo of the `arc` instruction
-
 port of http://codepen.io/lingtalfi/pen/yaLWJG
 -}
 
@@ -15,6 +14,7 @@ import Svg.Attributes exposing (color, stroke, cx, cy, r, x1, x2, y1, y2, stroke
 import Svg.Path exposing (..)
 import Json.Decode as Json
 import Mouse exposing (Position)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2)
 
 
 main =
@@ -35,32 +35,32 @@ type alias Model =
     , rotation : Float
     , largeArcFlag : ArcFlag
     , sweepFlag : Direction
-    , locationA : Point
-    , locationB : Point
+    , locationA : Vec2
+    , locationB : Vec2
     , drag : Maybe Drag
     }
 
 
 model =
-    { radius = ( 100, 100 )
+    { radius = ( 120, 120 )
     , rotation = 0
     , largeArcFlag = smallestArc
     , sweepFlag = antiClockwise
-    , locationA = ( 100, 250 )
-    , locationB = ( 200, 250 )
+    , locationA = vec2 100 250
+    , locationB = vec2 200 250
     , drag = Nothing
     }
 
 
 type alias Drag =
-    { node : Node, lstart : Point, start : Position, current : Position }
+    { node : Node, lstart : Vec2, start : Vec2, current : Vec2 }
 
 
 type Msg
     = Setter (Model -> Model)
-    | DragStart Node Position
-    | DragAt Position
-    | DragEnd Position
+    | DragStart Node Vec2
+    | DragAt Vec2
+    | DragEnd Vec2
 
 
 subscriptions : Model -> Sub Msg
@@ -70,7 +70,7 @@ subscriptions model =
             Sub.none
 
         Just _ ->
-            Sub.batch [ Mouse.moves DragAt, Mouse.ups DragEnd ]
+            Sub.batch [ Mouse.moves (DragAt << fromIntRecord), Mouse.ups (DragEnd << fromIntRecord) ]
 
 
 type Node
@@ -101,13 +101,13 @@ updateHelper msg model =
                     case node of
                         A ->
                             { model
-                                | locationA = add lstart (subtract pos start)
+                                | locationA = Vec2.add lstart (Vec2.sub pos start)
                                 , drag = Just <| Drag node lstart start pos
                             }
 
                         B ->
                             { model
-                                | locationB = add lstart (subtract pos start)
+                                | locationB = Vec2.add lstart (Vec2.sub pos start)
                                 , drag = Just <| Drag node lstart start pos
                             }
 
@@ -118,24 +118,26 @@ updateHelper msg model =
             { model | drag = Nothing }
 
 
-add : Point -> Position -> Point
-add ( x, y ) delta =
-    ( x + toFloat delta.x, y + toFloat delta.y )
+line : Vec2 -> Vec2 -> List (Svg.Attribute msg) -> List (Svg msg) -> Svg msg
+line from to attributes children =
+    let
+        ( ( a, b ), ( c, d ) ) =
+            ( Vec2.toTuple from, Vec2.toTuple to )
+    in
+        Svg.line (x1 (toString a) :: x2 (toString c) :: y1 (toString b) :: y2 (toString d) :: attributes) children
 
 
-subtract : Position -> Position -> Position
-subtract a b =
-    { x = a.x - b.x, y = a.y - b.y }
+circle : Vec2 -> Float -> List (Svg.Attribute msg) -> List (Svg msg) -> Svg msg
+circle center radius attributes children =
+    let
+        ( x, y ) =
+            Vec2.toTuple center
+    in
+        Svg.circle (cx (toString x) :: cy (toString y) :: r (toString radius) :: attributes) children
 
 
-line : Point -> Point -> List (Svg.Attribute msg) -> List (Svg msg) -> Svg msg
-line ( a, b ) ( c, d ) attributes children =
-    Svg.line (x1 (toString a) :: x2 (toString c) :: y1 (toString b) :: y2 (toString d) :: attributes) children
-
-
-circle : Point -> Float -> List (Svg.Attribute msg) -> List (Svg msg) -> Svg msg
-circle ( x, y ) radius attributes children =
-    Svg.circle (cx (toString x) :: cy (toString y) :: r (toString radius) :: attributes) children
+openEnding =
+    open
 
 
 view : Model -> Html Msg
@@ -148,17 +150,24 @@ view model =
                 "green"
 
         makeArcPath start radius rotation ( arc, sweep ) goal =
-            Svg.path
-                [ Svg.Path.pathToAttribute
-                    [ subpath (moveBy start) open <|
-                        [ arcTo radius rotation ( arc, sweep ) goal ]
+            let
+                singleton x =
+                    [ x ]
+
+                data =
+                    [ arcTo radius rotation ( arc, sweep ) goal ]
+                        |> subpath (startAt start) openEnding
+                        |> singleton
+                        |> Svg.Path.pathToString
+            in
+                Svg.path
+                    [ Svg.Attributes.d data
+                    , stroke (arcColor arc sweep)
+                    , Svg.Attributes.id "arc"
+                    , strokeWidth "4"
+                    , fill "none"
                     ]
-                , stroke (arcColor arc sweep)
-                , Svg.Attributes.id "arc"
-                , strokeWidth "4"
-                , fill "none"
-                ]
-                []
+                    []
 
         variations =
             [ ( largestArc, clockwise )
@@ -168,54 +177,44 @@ view model =
             ]
 
         arcs { locationA, radius, rotation, locationB } =
-            List.map (\( arc, direction ) -> makeArcPath locationA radius rotation ( arc, direction ) locationB) variations
+            List.map (\( arc, direction ) -> makeArcPath (Vec2.toTuple locationA) radius rotation ( arc, direction ) (Vec2.toTuple locationB)) variations
+
+        unit =
+            Vec2.direction model.locationA model.locationB
+                |> Vec2.scale 500
 
         ( lineEnd1, lineEnd2 ) =
-            let
-                mul n ( a, b ) =
-                    ( n * a, n * b )
-
-                unit =
-                    ( fst model.locationA - fst model.locationB
-                    , snd model.locationA - snd model.locationB
-                    )
-
-                addP ( a, b ) ( c, d ) =
-                    ( a + c, b + d )
-
-                subP ( a, b ) ( c, d ) =
-                    ( a - c, b - d )
-            in
-                ( addP model.locationB (mul 5 unit)
-                , subP model.locationA (mul 5 unit)
-                )
+            ( Vec2.sub model.locationB unit
+            , Vec2.add model.locationA unit
+            )
 
         diagram =
-            Svg.svg [ Svg.Attributes.width "100%", Svg.Attributes.height "500px" ] <|
-                arcs model
-                    ++ [ line model.locationA model.locationB [ fill "none", stroke "black", strokeWidth "2" ] []
-                       , line model.locationA lineEnd1 [ fill "none", stroke "black", strokeWidth "2" ] []
-                       , line model.locationB lineEnd2 [ fill "none", stroke "black", strokeWidth "2" ] []
-                       , circle model.locationA 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown A ] []
-                       , circle model.locationB 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown B ] []
-                       ]
+            Svg.svg [ Svg.Attributes.width "100%", Svg.Attributes.height "500px" ]
+                <| arcs model
+                ++ [ line model.locationA model.locationB [ fill "none", stroke "black", strokeWidth "2" ] []
+                   , line model.locationA lineEnd1 [ fill "none", stroke "black", strokeWidth "2" ] []
+                   , line model.locationB lineEnd2 [ fill "none", stroke "black", strokeWidth "2" ] []
+                   , circle model.locationA 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown A ] []
+                   , circle model.locationB 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown B ] []
+                   ]
 
         field label element =
             div [] [ text label, element ]
 
         controls =
             Html.div []
-                [ field "Radius x: " <| slider 0 100 250 (\v model -> { model | radius = ( v, snd model.radius ) })
-                , field "Radius y: " <| slider 0 100 250 (\v model -> { model | radius = ( fst model.radius, v ) })
+                [ field "Radius x: " <| slider 0 100 400 (\v model -> { model | radius = ( v, snd model.radius ) })
+                , field "Radius y: " <| slider 0 100 400 (\v model -> { model | radius = ( fst model.radius, v ) })
                 , field "Rotation: " <| slider 0 360 0 (\v model -> { model | rotation = v })
                 , field "largeArcFlag: " <| checkbox (\v model -> { model | largeArcFlag = choice v largestArc smallestArc })
                 , field "sweepFlag:    " <| checkbox (\v model -> { model | sweepFlag = choice v clockwise antiClockwise })
                 , text ("model: " ++ toString model)
-                , text <|
-                    pathToString <|
-                        [ subpath (startAt ( 100, 100 )) closed <|
-                            [ arcTo ( 50, 70 ) 0 ( largestArc, clockwise ) ( 200, 100 ) ]
-                        ]
+                , br [] []
+                , [ arcTo ( 50, 70 ) 0 ( largestArc, clockwise ) ( 200, 100 ) ]
+                    |> subpath (startAt ( 200, 200 )) closed
+                    |> (\x -> [ x ])
+                    |> pathToString
+                    |> text
                 ]
     in
         Html.div []
@@ -263,4 +262,9 @@ unsafeParseFloat v =
 
 onMouseDown : Node -> Attribute Msg
 onMouseDown node =
-    on "mousedown" (Json.map (DragStart node) Mouse.position)
+    on "mousedown" (Json.map (DragStart node << fromIntRecord) Mouse.position)
+
+
+fromIntRecord : { a | x : Int, y : Int } -> Vec2
+fromIntRecord { x, y } =
+    vec2 (toFloat x) (toFloat y)
