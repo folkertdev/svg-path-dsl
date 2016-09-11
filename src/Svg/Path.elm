@@ -3,6 +3,7 @@ module Svg.Path
         ( Path
         , Subpath
         , subpath
+        , emptySubpath
         , Instruction
         , Point
         , StartingPoint
@@ -70,7 +71,7 @@ this module uses a `To` suffix for absolute commands and a `By` suffix for relat
 Only curves take multiple points that are used as control points.
 
 #Path
-@docs Path, Subpath, subpath, Instruction, Point
+@docs Path, Subpath, subpath, emptySubpath, Instruction, Point
 
 #Converting
 @docs pathToString, pathToStringWithPrecision, pathToAttribute
@@ -86,13 +87,14 @@ Only curves take multiple points that are used as control points.
 @docs verticalTo, verticalBy, horizontalTo, horizontalBy
 
 #Arc
-Arcs are segments of ellipses. The arc command describes an ellips and what segment of that elips to draw.
+Arcs are segments of ellipses. The arc command describes an ellipse and what segment of that ellipse to draw.
 
-The first argument is an (rx, ry) pair - the radii of the elips. The second argument `xAxisRotate` rotates
-the elips around its center by a number of degrees. The final argument is the center of the ellips.
+The ellipse is described by the first, second and final argument.
+The first argument is an (rx, ry) pair - the horizontal and vertical radii of the ellipse. The second argument `xAxisRotate` rotates
+the ellipse around its center by a number of degrees. The final argument is the center of the ellips.
 
-The remaining argument is a pair of flags that select the part of the ellips to draw.
-For a visual interactive demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
+The remaining argument is a pair of flags that select the part of the ellipse to draw.
+For an interactive visual demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
 
 @docs arcTo, arcBy
 ##arc size
@@ -186,6 +188,13 @@ subpath =
     Subpath
 
 
+{-| An empty subpath
+-}
+emptySubpath : Subpath
+emptySubpath =
+    subpath (moveBy ( 0, 0 )) open []
+
+
 {-| Starting point of a subpath.
 -}
 type StartingPoint
@@ -215,7 +224,7 @@ type CloseOption
 
 {-| Create a closed subpath. After the final
 instruction, a line will be drawn from the current
-point to the starting point.
+point to the starting point of the subpath.
 -}
 closed : CloseOption
 closed =
@@ -309,7 +318,7 @@ lineTo =
     "L20,20 L40,40"
     "L20,20  40,40"
 
-Using `lineToMany` is convenient, more efficient and produces
+Using `lineToMany` is convenient, more efficient, and produces
 shorter SVG.
 -}
 lineToMany : List Point -> Instruction
