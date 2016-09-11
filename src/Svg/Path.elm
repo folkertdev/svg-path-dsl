@@ -57,18 +57,21 @@ module Svg.Path
 
 {-| A domain-specific language for SVG paths.
 
-The path syntax is a minimal syntax to describe SVG paths in 2D space. It looks a bit like assembly and is hard to
-read. That is the problem this module solves. Here are some resources to learn more about
+The svg coordinate system has its origin in the upper-left corner with the positive x-axis pointing to the right and
+the positive y-axis pointing down. A much more in-depth explanation of the svg coordinate system and how to manipulate it
+can be found [here](https://sarasoueidan.com/blog/svg-coordinate-systems/).
+
+The path syntax has absolute and relative instructions.
+* **Absolute instructions have a `*To` suffix** and move to absolute coordinates, so
+`lineTo (20, 20)` draws a line from the current position to the location `(20, 20)`.
+* **Relative instructions have a `*By` suffix** and move the current position, so `lineBy (20, 20)` draws a line from the current position `(cy, cy)` to
+the location `(cx + 20, cy + 20)`.
+
+
+For the curious, here are some resources to learn more about
  [`<path>` elements](https://developer.mozilla.org/en/docs/Web/SVG/Tutorial/Paths)
  and the [`d` attribute syntax](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d).
 
-**Conventions**
-
-* To distinguish between absolute (capital letters, like `L20,20`) and relative (lowercase letters, like `l20,20`) instructions,
-this module uses a `To` suffix for absolute commands and a `By` suffix for relative commands.
-
-* When a function takes multiple `Point` arguments, the final point is always `(x, y)` for absolute or `(dx, dy)` for relative.
-Only curves take multiple points that are used as control points.
 
 #Path
 @docs Path, Subpath, subpath, emptySubpath, Instruction, Point
@@ -95,6 +98,7 @@ the ellipse around its center by a number of degrees. The final argument is the 
 
 The remaining argument is a pair of flags that select the part of the ellipse to draw.
 For an interactive visual demo, see [http://codepen.io/lingtalfi/pen/yaLWJG](http://codepen.io/lingtalfi/pen/yaLWJG).
+
 
 @docs arcTo, arcBy
 ##arc size
@@ -144,13 +148,27 @@ type alias Path =
 
 
 {-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
+
+    Svg.path
+        [ d (pathToString myPath)
+        , stroke "black"
+        , fill "none"
+        ]
+        []
 -}
 pathToString : Path -> String
 pathToString path =
     instructionsToString Nothing (List.foldr subPathToInstructions [] path)
 
 
-{-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
+{-| Convert a path into an svg attribute. Use it like
+
+    Svg.path
+        [ pathToAttribute myPath
+        , stroke "black"
+        , fill "none"
+        ]
+        []
 -}
 pathToAttribute : Path -> Svg.Attribute msg
 pathToAttribute path =
@@ -181,7 +199,7 @@ type Subpath
 
 
 {-| Construct a subpath from a starting point (`startAt (x, y)` or `moveBy (dx, dy)`), a closing option (`closed` or `open`)
-and a list of intructions.
+and a list of instructions.
 -}
 subpath : StartingPoint -> CloseOption -> List Instruction -> Subpath
 subpath =
@@ -210,6 +228,12 @@ startAt =
 
 {-| Start a subpath at the location given by
 moving the current location by `(dx, dy)`.
+
+when the current cursor position is `(10, 10)`, the subpath
+
+    subpath (moveBy (5, 10)) open [ ... ]
+
+will start at the position `(15, 20)`.
 -}
 moveBy : Point -> StartingPoint
 moveBy =
@@ -225,6 +249,20 @@ type CloseOption
 {-| Create a closed subpath. After the final
 instruction, a line will be drawn from the current
 point to the starting point of the subpath.
+
+    subpath (startAt ( 0, 0 )) closed <|
+        [ lineTo ( 100, 0 )
+        , lineTo ( 150, 100 )
+        , lineTo ( 50, 100 )
+        ]
+
+yields
+
+<svg width="100%" height="120px" id="svgcontext">
+    <g transform="translate(10, 10)">
+        <path d="M0,0 L100,0 L150,100 L50,100 Z" fill="red" stroke="black" stroke-width="5"></path>
+    </g>
+</svg>
 -}
 closed : CloseOption
 closed =
@@ -232,6 +270,20 @@ closed =
 
 
 {-| Create an open path.
+
+    subpath (startAt ( 0, 0 )) open <|
+        [ lineTo ( 100, 0 )
+        , lineTo ( 150, 100 )
+        , lineTo ( 50, 100 )
+        ]
+
+yields
+
+<svg width="100%" height="120px" id="svgcontext">
+    <g transform="translate(10, 10)">
+        <path d="M0,0 L100,0 L150,100 L50,100" fill="red" stroke="black" stroke-width="5"></path>
+    </g>
+</svg>
 -}
 open : CloseOption
 open =
@@ -384,8 +436,10 @@ horizontalBy =
         |> subpath (startAt ( 100, 100 )) open
 
 Produces `M100,100 A50,70 0 1,1 200,100` which displays as
-<svg width="100%" height="100px" id="svgcontext">
-    <path           d="M100,100 A50,70 0 1,1 200,100" fill="none" stroke="black" stroke-width="2"></path>
+<svg width="100%" height="120px" id="svgcontext">
+    <g transform="translate(10, 10)">
+        <path d="M100,100 A50,70 0 1,1 200,100" fill="none" stroke="black" stroke-width="2"></path>
+    </g>
 </svg>
 
 -}
@@ -505,31 +559,37 @@ smallestArc =
 
 {-| Draws a line from the current position to the starting point of the subpath.
 
-    subpath (startAt (0, 10)) open <|
-        [ lineTo (100, 10)
-        , lineTo (150, 110)
-        , lineTo (50, 110)
+    subpath (startAt (0, 0)) open <|
+        [ lineTo (100, 0)
+        , lineTo (150, 100)
+        , lineTo (50, 100)
         ]
 
 Yields
 
 <svg width="100%" height="120px" id="svgcontext">
-    <path id="arc2" d="M0,10 L100,10 L150,110 L50,110" fill="red" stroke="black" stroke-width="5"></path>
+    <g transform="translate(10, 10)">
+        <path d="M0,0 L100,0 L150,100 L50,100" fill="red" stroke="black" stroke-width="5"></path>
+    </g>
 </svg>
 
-    subpath (startAt (0, 10)) open <|
-        [ lineTo (100, 10)
-        , lineTo (150, 110)
+    subpath (startAt (0, 0)) open <|
+        [ lineTo (100, 0)
+        , lineTo (150, 100)
         , toStart
-        , lineTo (50, 110)
+        , lineTo (50, 100)
         ]
 
 Yields
 
 <svg width="100%" height="120px" id="svgcontext">
-    <path id="arc2" d="M0,10 L100,10 L150,110 Z L50,110" fill="red" stroke="black" stroke-width="5"></path>
+    <g transform="translate(10, 10)">
+        <path d="M0,0 L100,0 L150,100 Z L50,100" fill="red" stroke="black" stroke-width="5"></path>
+    </g>
 </svg>
 
+After drawing a line to the second point, toStart draws a line to the initial point of the subpath and
+then continues drawing.
 -}
 toStart : Instruction
 toStart =
@@ -543,11 +603,13 @@ toStart =
 {-| Draws a curve between the current and the goal point. The position
 of the control point determines the path of the curve.
 
-    subpath (startAt (110, 10)) open
-        <| [ quadraticTo (10, 10) (10, 110) ]
+    subpath (startAt (100, 0)) open
+        <| [ quadraticTo (0, 0) (0, 100) ]
 Yields
 <svg width="120px" height="120px" id="svgcontext">
-    <path d="M110,10 Q10,10 10,110" fill="none" stroke="black" stroke-width="5"></path>
+    <g transform="translate(10, 10)">
+        <path d="M100,0 Q0,0 0,100" fill="none" stroke="black" stroke-width="5"></path>
+    </g>
 </svg>
 -}
 quadraticTo : Point -> Point -> Instruction
@@ -626,17 +688,15 @@ cubicContinueBy =
 
 {-| Extend a curve by a quadratic point
 
-    [ quadraticToMany ( 52.5, 100 ) ( 95, 40 ) <|
-        List.map quadraticContinueTo
-            [ ( 180, 40 )
-            , ( 265, 40 )
-            ]
-    ]
+
+    [ ( 180, 40 ) , ( 265, 40 ) ]
+        |> List.map quadraticContinueTo
+        |> quadraticToMany ( 52.5, 100 ) ( 95, 40 )
+        |> (\x -> [ x ]) -- make list of instructions
         |> subpath (startAt (10, 40)) open
 
-    -- produces "M10,40  Q52.5,100  95,40 T180,40 T265,40"
 
-Creates
+Produces `"M10,40  Q52.5,100  95,40 T180,40 T265,40"` and displays as
 
 <svg style="margin-left: 90px;" width="275" height="100px"><path fill="red" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
     d="M10,40  Q52.5,100  95,40 T180,40 T265,40 "></path></svg>
