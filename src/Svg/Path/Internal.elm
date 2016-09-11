@@ -25,9 +25,7 @@ type Instruction
     = ClosePath
       -- move (*many versions for optimization)
     | MoveAbsolute Point
-    | MoveAbsoluteMany (List Point)
     | MoveRelative Point
-    | MoveRelativeMany (List Point)
       -- line
     | LineAbsolute Point
     | LineAbsoluteMany (List Point)
@@ -108,14 +106,8 @@ formatInstruction dp segment =
             MoveAbsolute point ->
                 letterAndPoint "M" point
 
-            MoveAbsoluteMany points ->
-                letterAndPoints "M" points
-
             MoveRelative point ->
                 letterAndPoint "m" point
-
-            MoveRelativeMany points ->
-                letterAndPoints "m" points
 
             LineAbsolute point ->
                 letterAndPoint "L" point
