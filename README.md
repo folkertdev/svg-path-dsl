@@ -1,40 +1,26 @@
 #SVG Path DSL - An Elm DSL for SVG Path elements
 
-**Very experimental**
+A nicer way to create svg paths. 
+
+Svg paths are easy to read for computers, but not for humans. This package provides a nicer 
+way to create paths, providing safety (no runtime exceptions!) and less room for typos.
 
 
-##ExampleStateful.elm
+#What's next
 
-An api where the next action can depend on the current state  (implemenation in Monadic.elm) 
+This is a very basic library. See it as a basic building block to build more 
+complex libraries with. 
 
+Here are some ideas:
 
-##Monadic.elm 
+* A parser for paths.
+* Optimizing paths (for example joining multiple lineTo's into one lineToMany)
+* Higher-level functionality - composing paths 
+* type-safe svg 
+* graphics libraries, inspired by Haskell's [diagrams](http://projects.haskell.org/diagrams/) or OCaml's [Vg](http://erratique.ch/software/vg/doc/Vg.html) or 
+the ideas discussed in [funcional image synthesis](http://conal.net/papers/bridges2001/bridges-medres.pdf).
+* visualization libraries (like D3)
 
-represents a diagram as `DrawState -> (appendable, DrawState)` (a pattern sometimes called the State monad). This thing has many nice properties from 
-a category theory perspective, which I hope to look at at some point.
-
-The basic design is to have a core sum type representing the SVG d primitives - called segment - and helpers to chain segments, thus building up more complicated structures. 
-in the view, the `Diagram (List Segment)` is converted to a string. 
-
-The small core means we can do all sorts of optimizations/manipulations at an abstract level - I'm thinking about merging two adjacent "M" instructions into one, for example. 
-Only at the very last moment do strings come into play. 
-
-With the DrawState we can also smartly combine diagrams. When combining diagrams A and B, the natural result is that B starts where A stops. But you could 
-also let them both start at the same place, for instance. This sort of thing is very easy with this architecture.
-
-
-##Path.elm 
-
-a straight `List Segment -> String` conversion, where `Segment` is a sum type representing the SVG d primitives (see [here](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/))
-
-
-
-##Internal.elm 
-
-types and very primitive formatting functions
-
-##ExampleNormal.elm 
-
-testing ground for the Path.elm api
+Please contact me if you want to work or collaborate on these!
 
 
