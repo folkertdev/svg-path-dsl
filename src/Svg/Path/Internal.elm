@@ -353,22 +353,6 @@ propagate instruction ({ start, current } as state) =
             MoveRelative p ->
                 { state | current = addPoint p current }
 
-            MoveAbsoluteMany ps ->
-                case last ps of
-                    Nothing ->
-                        state
-
-                    Just p ->
-                        { state | current = p }
-
-            MoveRelativeMany ps ->
-                case last ps of
-                    Nothing ->
-                        state
-
-                    Just p ->
-                        { state | current = addPoint current p }
-
             LineAbsolute p ->
                 { state | current = p }
 
@@ -448,12 +432,6 @@ map f instruction =
 
             MoveRelative p ->
                 MoveRelative (f p)
-
-            MoveAbsoluteMany p ->
-                MoveAbsoluteMany (List.map f p)
-
-            MoveRelativeMany p ->
-                MoveRelativeMany (List.map f p)
 
             LineAbsolute p ->
                 LineAbsolute (f p)
