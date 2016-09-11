@@ -1,4 +1,4 @@
-module Svg.Path.Internal exposing (Point, CurveContinuation(..), Instruction(..), Direction(..), ArcFlag(..))
+module Svg.Path.Internal exposing (Point, CurveContinuation(..), Instruction(..), Direction(..), ArcFlag(..), formatInstruction)
 
 import String
 import Html
