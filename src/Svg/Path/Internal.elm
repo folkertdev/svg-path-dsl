@@ -125,13 +125,23 @@ formatInstruction dp segment =
                 letterAndPoint "L" point
 
             LineAbsoluteMany points ->
-                letterAndPoints "L" points
+                case points of
+                    [] ->
+                        ""
+
+                    _ ->
+                        letterAndPoints "L" points
 
             LineRelative point ->
                 letterAndPoint "l" point
 
             LineRelativeMany points ->
-                letterAndPoints "l" points
+                case points of
+                    [] ->
+                        ""
+
+                    _ ->
+                        letterAndPoints "l" points
 
             VerticalAbsolute y ->
                 letterAndFloat "V" y
