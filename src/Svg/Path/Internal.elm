@@ -27,7 +27,7 @@ type CurveContinuation
 -}
 type Instruction
     = ClosePath
-      -- move (*many versions for optimization)
+      -- move
     | MoveAbsolute Point
     | MoveRelative Point
       -- line
