@@ -174,7 +174,7 @@ type alias CloseOption =
 -}
 pathToString : Path -> String
 pathToString path =
-    instructionsToString Nothing (List.foldr subPathToInstructions [] path)
+    instructionsToString Nothing (List.foldr subpathToInstructions [] path)
 
 
 {-| Convert a path into an svg attribute. Use it like
@@ -188,7 +188,7 @@ pathToString path =
 -}
 pathToAttribute : Path -> Svg.Attribute msg
 pathToAttribute path =
-    instructionsToString Nothing (List.foldr subPathToInstructions [] path)
+    instructionsToString Nothing (List.foldr subpathToInstructions [] path)
         |> Svg.Attributes.d
 
 
@@ -197,7 +197,7 @@ The first argument gives the maximum number of decimal places any number in the 
 -}
 pathToStringWithPrecision : Int -> Path -> String
 pathToStringWithPrecision decimalPlaces path =
-    instructionsToString (Just decimalPlaces) (List.foldr subPathToInstructions [] path)
+    instructionsToString (Just decimalPlaces) (List.foldr subpathToInstructions [] path)
 
 
 {-| A subpath is a list of svg instructions with a starting point and a closing option.
