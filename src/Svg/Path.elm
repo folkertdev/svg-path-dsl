@@ -135,6 +135,10 @@ import Svg.Path.Internal as Internal
         , CurveContinuation(..)
         , Direction(..)
         , ArcFlag(..)
+        , CloseOption(..)
+        , StartingPoint(..)
+        , Subpath
+        , subpathToInstructions
         )
 import String
 import Svg
@@ -145,6 +149,18 @@ import Svg.Attributes
 -}
 type alias Path =
     List Subpath
+
+
+{-| Starting point of a subpath.
+-}
+type alias StartingPoint =
+    Internal.StartingPoint
+
+
+{-| Close the subpath or not.
+-}
+type alias CloseOption =
+    Internal.CloseOption
 
 
 {-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
@@ -176,14 +192,6 @@ pathToAttribute path =
         |> Svg.Attributes.d
 
 
-subPathToInstructions : Subpath -> List Instruction -> List Instruction
-subPathToInstructions (Subpath (StartingPoint start) (CloseOption closePath) segments) accum =
-    if closePath then
-        (start :: segments) ++ (toStart :: accum)
-    else
-        (start :: segments) ++ accum
-
-
 {-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
 The first argument gives the maximum number of decimal places any number in the output will have.
 -}
@@ -194,8 +202,8 @@ pathToStringWithPrecision decimalPlaces path =
 
 {-| A subpath is a list of svg instructions with a starting point and a closing option.
 -}
-type Subpath
-    = Subpath StartingPoint CloseOption (List Instruction)
+type alias Subpath =
+    Internal.Subpath
 
 
 {-| Construct a subpath from a starting point (`startAt (x, y)` or `moveBy (dx, dy)`), a closing option (`closed` or `open`)
@@ -203,7 +211,7 @@ and a list of instructions.
 -}
 subpath : StartingPoint -> CloseOption -> List Instruction -> Subpath
 subpath =
-    Subpath
+    Internal.subpath
 
 
 {-| An empty subpath
@@ -211,12 +219,6 @@ subpath =
 emptySubpath : Subpath
 emptySubpath =
     subpath (moveBy ( 0, 0 )) open []
-
-
-{-| Starting point of a subpath.
--}
-type StartingPoint
-    = StartingPoint Instruction
 
 
 {-| Start a subpath at the absolute coordinates `(x, y)`.
@@ -240,12 +242,6 @@ moveBy =
     StartingPoint << MoveRelative
 
 
-{-| Close the subpath or not.
--}
-type CloseOption
-    = CloseOption Bool
-
-
 {-| Create a closed subpath. After the final
 instruction, a line will be drawn from the current
 point to the starting point of the subpath.
@@ -266,7 +262,7 @@ yields
 -}
 closed : CloseOption
 closed =
-    CloseOption True
+    Internal.CloseOption True
 
 
 {-| Create an open path.
@@ -287,7 +283,7 @@ yields
 -}
 open : CloseOption
 open =
-    CloseOption False
+    Internal.CloseOption False
 
 
 {-| What direction to pick. Also called "sweep flag".

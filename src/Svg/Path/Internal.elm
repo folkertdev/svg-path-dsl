@@ -1,4 +1,17 @@
-module Svg.Path.Internal exposing (Point, CurveContinuation(..), Instruction(..), Direction(..), ArcFlag(..), formatInstruction)
+module Svg.Path.Internal
+    exposing
+        ( Point
+        , CurveContinuation(..)
+        , Instruction(..)
+        , Direction(..)
+        , ArcFlag(..)
+        , formatInstruction
+        , Subpath
+        , CloseOption(..)
+        , StartingPoint(..)
+        , subpathToInstructions
+        , subpath
+        )
 
 import String
 import Html
@@ -12,6 +25,67 @@ type alias Point =
 
 point x y =
     ( x, y )
+
+
+{-| Close the subpath or not.
+-}
+type CloseOption
+    = CloseOption Bool
+
+
+{-| Starting point of a subpath.
+-}
+type StartingPoint
+    = StartingPoint Instruction
+
+
+type Subpath
+    = Subpath StartingPoint CloseOption (List Instruction)
+
+
+subpath =
+    Subpath
+
+
+g : Subpath -> DrawState -> ( DrawState, Subpath )
+g subpath state =
+    let
+        translated =
+            mapSubpath (addPoint state.current) subpath
+
+        simulate =
+            List.foldl propagate
+    in
+        ( simulate state (subpathToInstructions translated []), translated )
+
+
+concatenate : List Subpath -> DrawState -> ( DrawState, List Subpath )
+concatenate subpaths state =
+    let
+        ( finalState, newSubpaths ) =
+            List.foldl helper ( state, [] ) subpaths
+
+        helper subpath ( currentState, accum ) =
+            let
+                ( stateAfter, newSubpath ) =
+                    g subpath currentState
+            in
+                ( stateAfter, newSubpath :: accum )
+    in
+        ( finalState, List.reverse newSubpaths )
+
+
+mapSubpath : (Point -> Point) -> Subpath -> Subpath
+mapSubpath f (Subpath (StartingPoint start) closeOpt instructions) =
+    Subpath (StartingPoint (map f start)) closeOpt (List.map (map f) instructions)
+
+
+subpathToInstructions : Subpath -> List Instruction -> List Instruction
+subpathToInstructions (Subpath (StartingPoint start) (CloseOption closePath) segments) accum =
+    if closePath then
+        (start :: segments) ++ (ClosePath :: accum)
+    else
+        (start :: segments) ++ accum
 
 
 {-| the T, t, S and s commands
