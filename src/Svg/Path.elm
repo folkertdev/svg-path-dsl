@@ -129,13 +129,18 @@ A continuation after a non-curve instruction should be replaced by `lineTo/lineB
 @docs quadraticContinueTo, quadraticContinueBy, cubicContinueTo, cubicContinueBy
 -}
 
-import Svg.Path.Internal as Internal
+import Svg.Path.Instruction as Instruction
     exposing
         ( Instruction(..)
+        , DrawInstruction(..)
+        , ManyInstruction(..)
         , CurveContinuation(..)
         , Direction(..)
         , ArcFlag(..)
-        , CloseOption(..)
+        )
+import Svg.Path.Subpath as Subpath
+    exposing
+        ( CloseOption(..)
         , StartingPoint(..)
         , Subpath
         , subpathToInstructions
@@ -154,13 +159,13 @@ type alias Path =
 {-| Starting point of a subpath.
 -}
 type alias StartingPoint =
-    Internal.StartingPoint
+    Subpath.StartingPoint
 
 
 {-| Close the subpath or not.
 -}
 type alias CloseOption =
-    Internal.CloseOption
+    Subpath.CloseOption
 
 
 {-| Convert a path into a string. Ready to use as argument to `Svg.Attributes.d`.
@@ -203,7 +208,7 @@ pathToStringWithPrecision decimalPlaces path =
 {-| A subpath is a list of svg instructions with a starting point and a closing option.
 -}
 type alias Subpath =
-    Internal.Subpath
+    Subpath.Subpath
 
 
 {-| Construct a subpath from a starting point (`startAt (x, y)` or `moveBy (dx, dy)`), a closing option (`closed` or `open`)
@@ -211,7 +216,7 @@ and a list of instructions.
 -}
 subpath : StartingPoint -> CloseOption -> List Instruction -> Subpath
 subpath =
-    Internal.subpath
+    Subpath.subpath
 
 
 {-| An empty subpath
@@ -225,7 +230,7 @@ emptySubpath =
 -}
 startAt : Point -> StartingPoint
 startAt =
-    StartingPoint << MoveAbsolute
+    StartingPoint << Absolute << Move
 
 
 {-| Start a subpath at the location given by
@@ -239,7 +244,7 @@ will start at the position `(15, 20)`.
 -}
 moveBy : Point -> StartingPoint
 moveBy =
-    StartingPoint << MoveRelative
+    StartingPoint << Relative << Move
 
 
 {-| Create a closed subpath. After the final
@@ -262,7 +267,7 @@ yields
 -}
 closed : CloseOption
 closed =
-    Internal.CloseOption True
+    Subpath.CloseOption True
 
 
 {-| Create an open path.
@@ -283,25 +288,25 @@ yields
 -}
 open : CloseOption
 open =
-    Internal.CloseOption False
+    Subpath.CloseOption False
 
 
 {-| What direction to pick. Also called "sweep flag".
 -}
 type alias Direction =
-    Internal.Direction
+    Instruction.Direction
 
 
 {-| What arc to pick.
 -}
 type alias ArcFlag =
-    Internal.ArcFlag
+    Instruction.ArcFlag
 
 
 {-| A single SVG instruction
 -}
 type alias Instruction =
-    Internal.Instruction
+    Instruction.Instruction
 
 
 {-| Convert an instruction to a string.
@@ -312,7 +317,7 @@ type alias Instruction =
 -}
 instructionToString : Maybe Int -> Instruction -> String
 instructionToString =
-    Internal.formatInstruction
+    Instruction.instructionToString
 
 
 {-| Convert a list of segments to string.
@@ -325,7 +330,7 @@ instructionToString =
 -}
 instructionsToString : Maybe Int -> List Instruction -> String
 instructionsToString maxNumOfDecimals =
-    String.join " " << List.map (Internal.formatInstruction maxNumOfDecimals)
+    String.join " " << List.map (Instruction.instructionToString maxNumOfDecimals)
 
 
 {-| Helper to convert a list of segments directly to an SVG attribute.
@@ -355,7 +360,7 @@ The code below draws a cube using absolute coordinates
 -}
 lineTo : Point -> Instruction
 lineTo =
-    LineAbsolute
+    Absolute << Line
 
 
 {-| Join many `lineTo`s into one instruction.
@@ -371,7 +376,7 @@ shorter SVG.
 -}
 lineToMany : List Point -> Instruction
 lineToMany =
-    LineAbsoluteMany
+    Absolute << Many << LineMany
 
 
 {-| Draw a line from the current cursor position to a position relative
@@ -389,42 +394,42 @@ The code below draws a cube using relative coordinates
 -}
 lineBy : Point -> Instruction
 lineBy =
-    LineRelative
+    Relative << Line
 
 
 {-| Relative version of `lineToMany`.
 -}
 lineByMany : List Point -> Instruction
 lineByMany =
-    LineRelativeMany
+    Relative << Many << LineMany
 
 
 {-| Draw a straight line from the current cursor position to the given y coordinate.
 -}
 verticalTo : Float -> Instruction
 verticalTo =
-    VerticalAbsolute
+    Absolute << Vertical
 
 
 {-| Draw a straight vertical line from the current cursor position of the given length.
 -}
 verticalBy : Float -> Instruction
 verticalBy =
-    VerticalRelative
+    Relative << Vertical
 
 
 {-| Draw a straight line from the current cursor position to the given x coordinate.
 -}
 horizontalTo : Float -> Instruction
 horizontalTo =
-    HorizontalAbsolute
+    Absolute << Horizontal
 
 
 {-| Draw a straight horizontal line from the current cursor position of the given length.
 -}
 horizontalBy : Float -> Instruction
 horizontalBy =
-    HorizontalRelative
+    Relative << Horizontal
 
 
 {-|
@@ -440,15 +445,15 @@ Produces `M100,100 A50,70 0 1,1 200,100` which displays as
 
 -}
 arcTo : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Instruction
-arcTo radius xstartangle ( largeArcFlag, sweepFlag ) point =
-    ArcTo radius xstartangle ( largeArcFlag, sweepFlag ) point
+arcTo radius xstartangle ( largeArcFlag, direction ) point =
+    Absolute <| Arc radius xstartangle ( largeArcFlag, direction ) point
 
 
 {-| Relative version of `arcTo`.
 -}
 arcBy : Point -> Float -> ( ArcFlag, Direction ) -> Point -> Instruction
 arcBy radius xstartangle ( largeArcFlag, direction ) point =
-    ArcBy radius xstartangle ( largeArcFlag, direction ) point
+    Relative <| Arc radius xstartangle ( largeArcFlag, direction ) point
 
 
 {-| Move from A to B in the clockwise direction
@@ -609,77 +614,77 @@ Yields
 </svg>
 -}
 quadraticTo : Point -> Point -> Instruction
-quadraticTo control point =
-    QuadraticAbsolute control point
+quadraticTo c =
+    Absolute << Quadratic c
 
 
 {-|
 -}
 quadraticBy : Point -> Point -> Instruction
-quadraticBy dcontrol dpoint =
-    QuadraticRelative dcontrol dpoint
+quadraticBy c =
+    Relative << Quadratic c
 
 
 {-|
 -}
 quadraticToMany : Point -> Point -> List CurveContinuation -> Instruction
-quadraticToMany =
-    QuadraticAbsoluteMany
+quadraticToMany c p cs =
+    Absolute << Many <| QuadraticMany c p cs
 
 
 {-|
 -}
 quadraticByMany : Point -> Point -> List CurveContinuation -> Instruction
-quadraticByMany =
-    QuadraticRelativeMany
+quadraticByMany c p cs =
+    Relative << Many <| QuadraticMany c p cs
 
 
 {-|
 -}
 cubicTo : Point -> Point -> Point -> Instruction
-cubicTo control1 control2 point =
-    CubicAbsolute control1 control2 point
+cubicTo c1 c2 p =
+    Absolute <| Cubic c1 c2 p
 
 
 {-|
 -}
 cubicBy : Point -> Point -> Point -> Instruction
-cubicBy dcontrol1 dcontrol2 dpoint =
-    CubicRelative dcontrol1 dcontrol2 dpoint
+cubicBy c1 c2 p =
+    Relative <| Cubic c1 c2 p
 
 
 {-|
 -}
 cubicToMany : Point -> Point -> Point -> List CurveContinuation -> Instruction
-cubicToMany =
-    CubicAbsoluteMany
+cubicToMany c1 c2 p =
+    Absolute << Many << CubicMany c1 c2 p
 
 
 {-|
 -}
 cubicByMany : Point -> Point -> Point -> List CurveContinuation -> Instruction
-cubicByMany =
-    CubicRelativeMany
+cubicByMany c1 c2 p =
+    Absolute << Many << CubicMany c1 c2 p
 
 
 {-| Extension of a curve by one point
 -}
 type alias CurveContinuation =
-    Internal.CurveContinuation
+    Instruction.CurveContinuation Point
 
 
 {-| Extend a curve by a cubic point
 -}
 cubicContinueTo : Point -> Point -> CurveContinuation
 cubicContinueTo =
-    CubiAbsolute
+    CubiContAbsolute
 
 
 {-|
 -}
 cubicContinueBy : Point -> Point -> CurveContinuation
 cubicContinueBy =
-    CubiRelative
+    CubiContRelative
 
 
 {-| Extend a curve by a quadratic point
@@ -699,11 +704,11 @@ Produces `"M10,40  Q52.5,100  95,40 T180,40 T265,40"` and displays as
 -}
 quadraticContinueTo : Point -> CurveContinuation
 quadraticContinueTo =
-    QuadAbsolute
+    QuadContAbsolute
 
 
 {-|
 -}
 quadraticContinueBy : Point -> CurveContinuation
 quadraticContinueBy =
-    QuadRelative
+    QuadContRelative
