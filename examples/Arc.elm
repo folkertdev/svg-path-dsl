@@ -6,7 +6,6 @@ port of http://codepen.io/lingtalfi/pen/yaLWJG
 
 import String
 import Svg exposing (Svg)
-import Html.App
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -18,7 +17,7 @@ import Math.Vector2 as Vec2 exposing (Vec2, vec2)
 
 
 main =
-    Html.App.program
+    Html.program
         { init = ( model, Cmd.none )
         , view = view
         , update = update
@@ -42,7 +41,7 @@ type alias Model =
 
 
 model =
-    { radius = ( 120, 120 )
+    { radius = ( 100, 100 )
     , rotation = 0
     , largeArcFlag = smallestArc
     , sweepFlag = antiClockwise
@@ -189,22 +188,22 @@ view model =
             )
 
         diagram =
-            Svg.svg [ Svg.Attributes.width "100%", Svg.Attributes.height "500px" ]
-                <| arcs model
-                ++ [ line model.locationA model.locationB [ fill "none", stroke "black", strokeWidth "2" ] []
-                   , line model.locationA lineEnd1 [ fill "none", stroke "black", strokeWidth "2" ] []
-                   , line model.locationB lineEnd2 [ fill "none", stroke "black", strokeWidth "2" ] []
-                   , circle model.locationA 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown A ] []
-                   , circle model.locationB 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown B ] []
-                   ]
+            Svg.svg [ Svg.Attributes.width "100%", Svg.Attributes.height "500px" ] <|
+                arcs model
+                    ++ [ line model.locationA model.locationB [ fill "none", stroke "black", strokeWidth "2" ] []
+                       , line model.locationA lineEnd1 [ fill "none", stroke "black", strokeWidth "2" ] []
+                       , line model.locationB lineEnd2 [ fill "none", stroke "black", strokeWidth "2" ] []
+                       , circle model.locationA 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown A ] []
+                       , circle model.locationB 5 [ fill "red", stroke "red", strokeWidth "2", onMouseDown B ] []
+                       ]
 
         field label element =
             div [] [ text label, element ]
 
         controls =
             Html.div []
-                [ field "Radius x: " <| slider 0 100 400 (\v model -> { model | radius = ( v, snd model.radius ) })
-                , field "Radius y: " <| slider 0 100 400 (\v model -> { model | radius = ( fst model.radius, v ) })
+                [ field "Radius x: " <| slider 0 100 400 (\v model -> { model | radius = ( v, Tuple.second model.radius ) })
+                , field "Radius y: " <| slider 0 100 400 (\v model -> { model | radius = ( Tuple.first model.radius, v ) })
                 , field "Rotation: " <| slider 0 360 0 (\v model -> { model | rotation = v })
                 , field "largeArcFlag: " <| checkbox (\v model -> { model | largeArcFlag = choice v largestArc smallestArc })
                 , field "sweepFlag:    " <| checkbox (\v model -> { model | sweepFlag = choice v clockwise antiClockwise })
@@ -232,13 +231,13 @@ choice b x y =
 
 checkbox : (Bool -> Model -> Model) -> Html Msg
 checkbox setter =
-    input [ type' "checkbox", onCheck (Setter << setter) ] []
+    input [ type_ "checkbox", onCheck (Setter << setter) ] []
 
 
 slider : Int -> Int -> Int -> (Float -> Model -> Model) -> Html Msg
 slider lower upper default setter =
     input
-        [ type' "range"
+        [ type_ "range"
         , Html.Attributes.min (toString lower)
         , Html.Attributes.max (toString upper)
         , defaultValue (toString default)

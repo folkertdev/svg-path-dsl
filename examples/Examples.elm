@@ -3,8 +3,8 @@ module Main exposing (..)
 import Html exposing (..)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Path exposing (..)
-import Internal exposing (..)
+import Svg.Path exposing (..)
+import Svg.Path.Internal exposing (..)
 import String
 
 

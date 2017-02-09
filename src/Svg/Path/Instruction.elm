@@ -265,10 +265,10 @@ mapAbsolute f instruction =
                         Cubic (f c1) (f c2) (f p)
 
                     Horizontal x ->
-                        Horizontal <| fst (f ( x, 0 ))
+                        Horizontal <| Tuple.first (f ( x, 0 ))
 
                     Vertical y ->
-                        Vertical <| snd (f ( 0, y ))
+                        Vertical <| Tuple.second (f ( 0, y ))
 
                     Many many ->
                         case many of
@@ -306,7 +306,7 @@ fixed : Int -> Float -> String
 fixed i n =
     let
         pow =
-            10 ^ i
+            toFloat (10 ^ i)
 
         nInt =
             round (n * pow)

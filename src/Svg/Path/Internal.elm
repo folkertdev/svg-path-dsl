@@ -250,7 +250,7 @@ fixed : Int -> Float -> String
 fixed i n =
     let
         pow =
-            10 ^ i
+            toFloat (10 ^ i)
 
         nInt =
             round (n * pow)
@@ -436,10 +436,10 @@ propagate instruction ({ start, current } as state) =
 map f instruction =
     let
         fX =
-            (\x -> fst (f ( x, 0 )))
+            (\x -> Tuple.first (f ( x, 0 )))
 
         fY =
-            (\y -> snd (f ( 0, y )))
+            (\y -> Tuple.second (f ( 0, y )))
     in
         case instruction of
             MoveAbsolute p ->
